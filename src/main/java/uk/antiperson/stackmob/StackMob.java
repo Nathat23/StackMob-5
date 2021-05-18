@@ -29,7 +29,6 @@ import java.util.logging.Level;
 public class StackMob extends JavaPlugin {
 
     private final NamespacedKey stackKey = new NamespacedKey(this, "stack-size");
-    private final NamespacedKey waitKey = new NamespacedKey(this, "wait-key");
     private final NamespacedKey toolKey = new NamespacedKey(this, "stack-tool");
 
     private MainConfig config;
@@ -91,12 +90,22 @@ public class StackMob extends JavaPlugin {
                     break;
             }
         }));
-        Metrics metrics = new Metrics(this);
+        Metrics metrics = new Metrics(this, 522);
         metrics.addCustomChart(new Metrics.SimplePie("stackmobbridge", () -> String.valueOf(Bukkit.getPluginManager().isPluginEnabled("StackMobBridge"))));
         if (metrics.isEnabled()) {
             getLogger().info("bStats anonymous data collection has been enabled!");
         }
         itemTools = new ItemTools(this);
+        getEntityManager().registerAllEntities();
+        if (!Utilities.isPaper()) {
+            getLogger().info("It has been detected that you are not using Paper (https://papermc.io).");
+            getLogger().info("StackMob makes use of Paper's API, which means you're missing out on features.");
+        }
+    }
+
+    @Override
+    public void onDisable() {
+        getEntityManager().unregisterAllEntities();
     }
 
     private void loadConfig() {
@@ -112,7 +121,7 @@ public class StackMob extends JavaPlugin {
     private void register() {
         int stackInterval = getMainConfig().getStackInterval();
         new MergeTask(this).runTaskTimer(this, 5, stackInterval);
-        if (Utilities.isNewBukkit() || getHookManager().getProtocolLibHook() != null) {
+        if (Utilities.isNativeVersion() || getHookManager().getProtocolLibHook() != null) {
             int tagInterval = getMainConfig().getTagNearbyInterval();
             new TagTask(this).runTaskTimer(this, 5, tagInterval);
         } else {
@@ -140,6 +149,14 @@ public class StackMob extends JavaPlugin {
         registerEvent(SpawnListener.class);
         registerEvent(TargetListener.class);
         registerEvent(PlayerListener.class);
+        registerEvent(BeeListener.class);
+        registerEvent(LeashListener.class);
+        registerEvent(EquipListener.class);
+        if (Utilities.isPaper()) {
+            registerEvent(RemoveListener.class);
+            return;
+        }
+        registerEvent(ChunkListener.class);
     }
 
     private void registerEvent(Class<? extends Listener> clazz) throws NoSuchMethodException, IllegalAccessException, InvocationTargetException, InstantiationException {
@@ -204,10 +221,6 @@ public class StackMob extends JavaPlugin {
 
     public NamespacedKey getStackKey() {
         return stackKey;
-    }
-
-    public NamespacedKey getWaitKey() {
-        return waitKey;
     }
 
     public NamespacedKey getToolKey() {

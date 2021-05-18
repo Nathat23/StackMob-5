@@ -35,11 +35,17 @@ public class TraitManager {
         registerTrait(ZombieBaby.class);
         registerTrait(BeeNectar.class);
         registerTrait(BeeStung.class);
+        registerTrait(Leash.class);
+        registerTrait(Potion.class);
+        registerTrait(VillagerProfession.class);
         if (!Utilities.isNewBukkit()) {
             return;
         }
         registerTrait(ZoglinBaby.class);
         registerTrait(PiglinBaby.class);
+        if (Utilities.isPaper()) {
+            registerTrait(TurtleHasEgg.class);
+        }
     }
 
     /**

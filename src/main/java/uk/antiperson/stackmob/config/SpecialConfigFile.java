@@ -4,6 +4,7 @@ import org.apache.commons.lang.math.NumberUtils;
 import org.bukkit.entity.EntityType;
 import uk.antiperson.stackmob.StackMob;
 
+import java.util.Collections;
 import java.util.List;
 
 public abstract class SpecialConfigFile extends ConfigFile {
@@ -14,7 +15,8 @@ public abstract class SpecialConfigFile extends ConfigFile {
 
     public ConfigList getList(EntityType type, String path) {
         ConfigValue configValue = get(type, path);
-        return configValue.getValue() instanceof List<?> ? ConfigList.getConfigList(this, new ConfigValue(configValue.getPath(), configValue.getValue())) : null;
+        configValue = configValue.getValue() instanceof List<?> ? configValue : new ConfigValue(path, Collections.emptyList());
+        return ConfigList.getConfigList(this, configValue);
     }
 
     public boolean getBoolean(EntityType type, String path) {
@@ -24,6 +26,9 @@ public abstract class SpecialConfigFile extends ConfigFile {
 
     public double getDouble(EntityType type, String path) {
         Object value = getValue(type, path);
+        if (value instanceof Integer) {
+            return NumberUtils.toInt(value.toString());
+        }
         return value instanceof Double ? NumberUtils.toDouble(value.toString()) : 0;
     }
 
@@ -56,27 +61,4 @@ public abstract class SpecialConfigFile extends ConfigFile {
         return new ConfigValue(path, get(path));
     }
 
-    /**
-     * Gets the custom config path for this entity if it has been specified. If not this will just be the normal value.
-     * @param type the entity type
-     * @param path the config path.
-     * @return the path for this config path and entity.
-     */
-    private String getPath(EntityType type, String path) {
-        if (!isFileLoaded()) {
-            throw new UnsupportedOperationException("Configuration file has not been loaded!");
-        }
-        // Check if the specified general config path is overridden by an entity specific equivalent.
-        String customPath = "custom." + type + "." + path;
-        if (isSet(customPath)) {
-            return customPath;
-        }
-        // Check if this entity specific path is specified to clone another path.
-        String clone = "custom." + type + ".clone";
-        String clonePath = "custom." + getString(clone) + "." + path;
-        if (isString(clonePath)) {
-            return clonePath;
-        }
-        return path;
-    }
 }

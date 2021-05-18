@@ -12,10 +12,12 @@ public class CommandArgument {
     private final ArgumentType type;
     private final boolean optional;
     private final List<String> expectedArguments;
-    public CommandArgument(ArgumentType type, boolean optional, List<String> expectedArguments) {
+    private final String name;
+    private CommandArgument(ArgumentType type, boolean optional, List<String> expectedArguments, String name) {
         this.type = type;
         this.optional = optional;
         this.expectedArguments = expectedArguments;
+        this.name = name;
     }
 
     public ArgumentType getType() {
@@ -49,16 +51,20 @@ public class CommandArgument {
         return strings;
     }
 
-    public static CommandArgument construct(ArgumentType type) {
-        return new CommandArgument(type, false, null);
+    public String getName() {
+        return name;
     }
 
     public static CommandArgument construct(ArgumentType type, boolean optional) {
-        return new CommandArgument(type, optional, null);
+        return new CommandArgument(type, optional, null, null);
+    }
+
+    public static CommandArgument construct(ArgumentType type, boolean optional, String name) {
+        return new CommandArgument(type, optional,null, name);
     }
 
     public static CommandArgument construct(ArgumentType type, boolean optional, List<String> expectedArguments) {
-        return new CommandArgument(type, optional, expectedArguments);
+        return new CommandArgument(type, optional, expectedArguments, null);
     }
 
 }

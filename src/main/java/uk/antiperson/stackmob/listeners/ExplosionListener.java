@@ -24,7 +24,7 @@ public class ExplosionListener implements Listener {
             return;
         }
         StackEntity stackEntity = sm.getEntityManager().getStackEntity((LivingEntity) event.getEntity());
-        if (stackEntity.isSingle()) {
+        if (stackEntity == null || stackEntity.isSingle()) {
             return;
         }
         double multiplier = ThreadLocalRandom.current().nextDouble(0.4, 0.6);

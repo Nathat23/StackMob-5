@@ -1,34 +1,34 @@
 package uk.antiperson.stackmob.entity.traits.trait;
 
-import org.bukkit.Material;
 import org.bukkit.entity.Drowned;
 import org.bukkit.entity.LivingEntity;
+import org.bukkit.inventory.EntityEquipment;
+import org.bukkit.inventory.EquipmentSlot;
+import org.bukkit.inventory.ItemStack;
 import uk.antiperson.stackmob.entity.traits.Trait;
 import uk.antiperson.stackmob.entity.traits.TraitMetadata;
-
-import java.util.Arrays;
-import java.util.List;
+import uk.antiperson.stackmob.utils.Utilities;
 
 @TraitMetadata(entity = Drowned.class, path = "drowned-hand-item")
 public class DrownedItem implements Trait {
-
-    private final List<Material> materials = Arrays.asList(Material.NAUTILUS_SHELL, Material.TRIDENT);
-
+    
     @Override
-    public boolean checkTrait(LivingEntity first, LivingEntity nearby) {
+    public boolean checkTrait (LivingEntity first, LivingEntity nearby) {
         Drowned oriDrowned = (Drowned) first;
         Drowned nearDrowned = (Drowned) nearby;
-        if(materials.contains(oriDrowned.getEquipment().getItemInMainHand().getType()) ||
-                materials.contains(nearDrowned.getEquipment().getItemInMainHand().getType())){
-            if(oriDrowned.getEquipment().getItemInMainHand().getType() !=
-                    nearDrowned.getEquipment().getItemInMainHand().getType()){
+        EntityEquipment oriEquipment = oriDrowned.getEquipment();
+        EntityEquipment nearEquipment = nearDrowned.getEquipment();
+        if (oriEquipment == null && nearEquipment == null) return true;
+        if (oriEquipment == null || nearEquipment == null) return false;
+        for (EquipmentSlot equipmentSlot : Utilities.HAND_SLOTS) {
+            ItemStack oriItemStack = oriEquipment.getItem(equipmentSlot);
+            ItemStack nearItemStack = nearEquipment.getItem(equipmentSlot);
+            if (!oriItemStack.isSimilar(nearItemStack)) {
+                continue;
+            }
+            if (Utilities.DROWNED_MATERIALS.contains(oriItemStack.getType())) {
                 return true;
             }
-        }
-        if(materials.contains(oriDrowned.getEquipment().getItemInOffHand().getType()) ||
-                materials.contains(nearDrowned.getEquipment().getItemInOffHand().getType())){
-            return oriDrowned.getEquipment().getItemInOffHand().getType() !=
-                    nearDrowned.getEquipment().getItemInOffHand().getType();
         }
         return false;
     }
@@ -37,11 +37,11 @@ public class DrownedItem implements Trait {
     public void applyTrait(LivingEntity spawned, LivingEntity dead) {
         Drowned oriDrowned = (Drowned) dead;
         Drowned spawnDrowned = (Drowned) spawned;
-        if(materials.contains(oriDrowned.getEquipment().getItemInMainHand().getType())){
-            spawnDrowned.getEquipment().setItemInMainHand(oriDrowned.getEquipment().getItemInMainHand());
-        }
-        if(materials.contains(oriDrowned.getEquipment().getItemInOffHand().getType())){
-            spawnDrowned.getEquipment().setItemInOffHand(oriDrowned.getEquipment().getItemInOffHand());
+        for (EquipmentSlot equipmentSlot : Utilities.HAND_SLOTS) {
+            ItemStack item = oriDrowned.getEquipment().getItem(equipmentSlot);
+            if (Utilities.DROWNED_MATERIALS.contains(item.getType())) {
+                spawnDrowned.getEquipment().setItem(equipmentSlot, item);
+            }
         }
     }
 }

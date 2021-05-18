@@ -5,9 +5,10 @@ import org.bukkit.entity.EntityType;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.event.entity.CreatureSpawnEvent;
 import uk.antiperson.stackmob.StackMob;
+import uk.antiperson.stackmob.entity.StackEntity;
 import uk.antiperson.stackmob.entity.death.DeathType;
-import uk.antiperson.stackmob.entity.TagMode;
 import uk.antiperson.stackmob.listeners.ListenerMode;
+import uk.antiperson.stackmob.utils.Utilities;
 
 import java.io.IOException;
 import java.util.*;
@@ -40,6 +41,14 @@ public class MainConfig extends SpecialConfigFile {
         return getInt("stack.interval");
     }
 
+    public boolean isCheckHasMoved() {
+        return getBoolean("stack.check-location.enabled");
+    }
+
+    public double getCheckHasMovedDistance() {
+        return getDouble("stack.check-location.distance");
+    }
+
     public String getTagFormat(EntityType type) {
         return getString(type, "display-name.format");
     }
@@ -48,8 +57,8 @@ public class MainConfig extends SpecialConfigFile {
         return getInt(type, "display-name.threshold");
     }
 
-    public TagMode getTagMode(EntityType type) {
-        return TagMode.valueOf(getString(type, "display-name.visibility"));
+    public StackEntity.TagMode getTagMode(EntityType type) {
+        return StackEntity.TagMode.valueOf(getString(type, "display-name.visibility"));
     }
 
     public Integer[] getTagNeabyRadius() {
@@ -162,6 +171,11 @@ public class MainConfig extends SpecialConfigFile {
         return ListenerMode.valueOf(getString(type, "events." + eventKey + ".mode"));
     }
 
+    public int getEventMultiplyLimit(EntityType type, String eventKey, int stackSize) {
+        int limit =  getInt(type, "events." + eventKey + ".limit");
+        return limit == -1 ? stackSize : Math.min(stackSize, limit);
+    }
+
     public boolean isWorldBlacklisted(EntityType type, World world) {
         return getList(type, "worlds-blacklist").contains(world.getName());
     }
@@ -177,26 +191,38 @@ public class MainConfig extends SpecialConfigFile {
     }
 
     public DeathType getDeathType(LivingEntity dead) {
-        for (String key : getDeathSection(dead)) {
-            ConfigList reasons = getList(dead.getType(), "death." + key + ".reason-blacklist");
-            if (reasons.contains(dead.getLastDamageCause().getCause().toString())) {
+        for (DeathType type : getDeathSection(dead)) {
+            ConfigList reasons = getList(dead.getType(), "death." + type + ".reason-blacklist");
+            if (dead.getLastDamageCause() != null && reasons.contains(dead.getLastDamageCause().getCause().toString())) {
                 continue;
             }
-            ConfigList types = getList(dead.getType(), "death." + key + ".type-blacklist");
+            ConfigList spawnReasons = getList(dead.getType(), "death." + type + ".spawn-reason-blacklist");
+            if (Utilities.isPaper() && spawnReasons.contains(dead.getEntitySpawnReason())) {
+                continue;
+            }
+            ConfigList types = getList(dead.getType(), "death." + type + ".type-blacklist");
             if (types.contains(dead.getType().toString())) {
                 continue;
             }
-            return DeathType.valueOf(key);
+            return type;
         }
         throw new UnsupportedOperationException("Configuration error - unable to determine death type!");
     }
 
-    private Collection<String> getDeathSection(LivingEntity dead) {
-        TreeMap<Integer, String> array = new TreeMap<>();
-        for (String key : getConfigurationSection("death").getKeys(false)) {
-            array.put(getInt(dead.getType(), "death." + key + ".priority"), key);
+    private Collection<DeathType> getDeathSection(LivingEntity dead) {
+        TreeMap<Integer, DeathType> array = new TreeMap<>();
+        for (DeathType type : DeathType.values()) {
+            array.put(getInt(dead.getType(), "death." + type + ".priority"), type);
         }
         return array.values();
+    }
+
+    public boolean isSkipDeathAnimation(EntityType type) {
+        return getBoolean(type, "death.skip-animation") && Utilities.isPaper();
+    }
+
+    public StackEntity.EquipItemMode getEquipItemMode(EntityType type) {
+        return StackEntity.EquipItemMode.valueOf(getString(type, "events.equip.mode"));
     }
 
     @Override

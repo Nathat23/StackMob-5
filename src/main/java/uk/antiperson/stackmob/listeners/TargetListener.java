@@ -26,10 +26,8 @@ public class TargetListener implements Listener {
         if (sm.getMainConfig().getTargetingDisabledTypes(event.getEntityType()).contains(event.getEntityType().toString())) {
             return;
         }
-        if (Utilities.isPaper()) {
-            if (sm.getMainConfig().getTargetingDisabledReasons(event.getEntityType()).contains(event.getEntity().getEntitySpawnReason())){
-                return;
-            }
+        if (Utilities.isPaper() && sm.getMainConfig().getTargetingDisabledReasons(event.getEntityType()).contains(event.getEntity().getEntitySpawnReason())){
+            return;
         }
         event.setCancelled(true);
     }

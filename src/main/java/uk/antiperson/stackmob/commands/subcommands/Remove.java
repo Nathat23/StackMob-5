@@ -3,9 +3,11 @@ package uk.antiperson.stackmob.commands.subcommands;
 import org.bukkit.entity.*;
 import uk.antiperson.stackmob.StackMob;
 import uk.antiperson.stackmob.commands.*;
+import uk.antiperson.stackmob.entity.StackEntity;
 
 import java.util.Arrays;
-import java.util.List;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.function.Function;
 
 @CommandMetadata(command = "remove", playerReq = true, desc = "Remove all entities")
@@ -19,7 +21,6 @@ public class Remove extends SubCommand {
 
     @Override
     public boolean onCommand(User sender, String[] args) {
-        Player player = (Player) sender.getSender();
         Function<Entity, Boolean> function = entity -> entity instanceof Mob;
         if (args.length == 1) {
             switch (args[0]) {
@@ -31,16 +32,15 @@ public class Remove extends SubCommand {
                     break;
             }
         }
-        List<LivingEntity> entities = player.getWorld().getLivingEntities();
-        for (LivingEntity entity : entities) {
-            if (!function.apply(entity)) {
+        Set<StackEntity> toRemove = new HashSet<>();
+        for (StackEntity stackEntity : sm.getEntityManager().getStackEntities()) {
+            if (!function.apply(stackEntity.getEntity())) {
                 continue;
             }
-            if (!sm.getEntityManager().isStackedEntity(entity)) {
-                continue;
-            }
-            entity.remove();
+            stackEntity.remove(false);
+            toRemove.add(stackEntity);
         }
+        toRemove.forEach(stackEntity -> sm.getEntityManager().unregisterStackedEntity(stackEntity));
         sender.sendSuccess("Entities matching your criteria have been removed.");
         return false;
     }

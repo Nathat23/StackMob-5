@@ -6,9 +6,12 @@ import org.bukkit.entity.EntityType;
 import org.bukkit.entity.ExperienceOrb;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Mob;
+import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.loot.LootContext;
 import uk.antiperson.stackmob.StackMob;
+import uk.antiperson.stackmob.config.ConfigList;
+import uk.antiperson.stackmob.utils.Utilities;
 
 import java.util.*;
 import java.util.concurrent.ThreadLocalRandom;
@@ -30,11 +33,20 @@ public class Drops {
         if (sm.getMainConfig().getDropTypeBlacklist(dead.getType()).contains(dead.getType().toString())) {
             return items;
         }
-        if (sm.getMainConfig().getDropReasonBlacklist(dead.getType()).contains(dead.getLastDamageCause().getCause().toString())) {
+        EntityDamageEvent lastDamageCause = dead.getLastDamageCause();
+        if (lastDamageCause == null || sm.getMainConfig().getDropReasonBlacklist(dead.getType()).contains(lastDamageCause.getCause().toString())) {
             return items;
         }
+        boolean useLootTables = sm.getMainConfig().isDropLootTables(dead.getType());
+        ConfigList itemBlacklist = sm.getMainConfig().getDropItemBlacklist(dead.getType());
+        ConfigList dropOneItemPer = sm.getMainConfig().getDropItemOnePer(dead.getType());
+        LootContext lc = new LootContext.Builder(dead.getLocation()).lootedEntity(dead).killer(dead.getKiller()).build();
+        Collection<ItemStack> genItems = originalDrops;
         for (int i = 0; i < deathAmount; i++) {
-            for (ItemStack is : calculateLoot(originalDrops)) {
+            if (useLootTables) {
+                genItems = ((Mob) dead).getLootTable().populateLoot(ThreadLocalRandom.current(), lc);
+            }
+            for (ItemStack is : genItems) {
                 if (is == null || is.getType() == Material.AIR) {
                     continue;
                 }
@@ -44,32 +56,15 @@ public class Drops {
                 if (is.getType() == Material.LEAD && dead.isLeashed()) {
                     continue;
                 }
-                if (sm.getMainConfig().getDropItemBlacklist(dead.getType())
-                        .contains(is.getType().toString())) {
+                if (itemBlacklist.contains(is.getType().toString())) {
                     continue;
                 }
-                int dropAmount = is.getAmount();
-                if (sm.getMainConfig().getDropItemOnePer(dead.getType())
-                        .contains(is.getType().toString())) {
-                    dropAmount = 1;
-                }
+                int dropAmount = dropOneItemPer.contains(is.getType().toString()) ? 1 : is.getAmount();
                 is.setAmount(1);
-                if (items.containsKey(is)) {
-                    items.put(is, items.get(is) + dropAmount);
-                    continue;
-                }
-                items.put(is, dropAmount);
+                items.compute(is, (key, amount) -> amount == null ? dropAmount : amount + dropAmount);
             }
         }
         return items;
-    }
-
-    private Collection<ItemStack> calculateLoot(List<ItemStack> originalDrops) {
-        if (!sm.getMainConfig().isDropLootTables(dead.getType())) {
-            return originalDrops;
-        }
-        LootContext lc = new LootContext.Builder(dead.getLocation()).lootedEntity(dead).killer(dead.getKiller()).build();
-        return ((Mob) dead).getLootTable().populateLoot(ThreadLocalRandom.current(), lc);
     }
 
     public static void dropItems(Location location, Map<ItemStack, Integer> items) {
@@ -77,16 +72,14 @@ public class Drops {
     }
 
     public static void dropItem(Location location, ItemStack stack, int amount) {
-        double inStacks = (double) amount / (double) stack.getMaxStackSize();
-        double floor = Math.floor(inStacks);
-        double leftOver = inStacks - floor;
-        for (int i = 0; i < floor; i++) {
-            stack.setAmount(stack.getMaxStackSize());
-            location.getWorld().dropItemNaturally(location, stack);
-        }
-        if (leftOver > 0) {
-            stack.setAmount((int) Math.round(leftOver * stack.getMaxStackSize()));
-            location.getWorld().dropItemNaturally(location, stack);
+        dropItem(location, stack, amount, false);
+    }
+
+    public static void dropItem(Location location, ItemStack stack, int amount, boolean above) {
+        Location dropLocation = above ? location.add(0,1,0) : location;
+        for (int itemAmount : Utilities.split(amount, stack.getMaxStackSize())) {
+            stack.setAmount(itemAmount);
+            location.getWorld().dropItem(dropLocation, stack);
         }
     }
 

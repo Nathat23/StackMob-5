@@ -16,6 +16,6 @@ public class KillStep extends DeathMethod {
     public int calculateStep() {
         int maxStep = getStackMob().getMainConfig().getMaxDeathStep(getEntity().getType());
         int minStep = getStackMob().getMainConfig().getMinDeathStep(getEntity().getType());
-        return ThreadLocalRandom.current().nextInt(minStep, maxStep);
+        return minStep == maxStep ? maxStep : ThreadLocalRandom.current().nextInt(minStep, maxStep);
     }
 }

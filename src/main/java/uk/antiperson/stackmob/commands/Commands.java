@@ -33,6 +33,7 @@ public class Commands implements CommandExecutor, TabCompleter {
         subCommands.add(new GiveTool(sm));
         subCommands.add(new Reload(sm));
         subCommands.add(new ForceStack(sm));
+        subCommands.add(new Stats(sm));
     }
 
     @Override
@@ -50,6 +51,8 @@ public class Commands implements CommandExecutor, TabCompleter {
                     if (argumentType.getExpectedArguments().size() <= 3 && argumentType.getExpectedArguments().size() > 0) {
                         argumentType.getExpectedArguments().forEach(argument -> options.append(argument).append("/"));
                         options.deleteCharAt(options.length() - 1);
+                    } else if (argumentType.getName() != null) {
+                        options.append(argumentType.getName());
                     } else {
                         options.append(argumentType.getType());
                     }
@@ -77,7 +80,9 @@ public class Commands implements CommandExecutor, TabCompleter {
                 return false;
             }
             subCommand.onCommand(new User(commandSender), (String[]) ArrayUtils.remove(strings, 0));
+            return false;
         }
+        commandSender.sendMessage(Utilities.PREFIX + ChatColor.RED + "Invalid subcommand!");
         return false;
     }
 
@@ -104,7 +109,7 @@ public class Commands implements CommandExecutor, TabCompleter {
                     break;
                 case ENTITY_TYPE:
                     try {
-                        EntityType.valueOf(args[i]);
+                        EntityType.valueOf(args[i].toUpperCase());
                     } catch (IllegalArgumentException e) {
                         return false;
                     }

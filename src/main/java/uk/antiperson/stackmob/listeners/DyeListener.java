@@ -9,7 +9,7 @@ import org.bukkit.inventory.ItemStack;
 import org.bukkit.material.Colorable;
 import uk.antiperson.stackmob.StackMob;
 import uk.antiperson.stackmob.entity.StackEntity;
-import uk.antiperson.stackmob.utils.EntityUtils;
+import uk.antiperson.stackmob.utils.Utilities;
 
 @ListenerMetadata(config = "events.dye.enabled")
 public class DyeListener implements Listener {
@@ -29,24 +29,25 @@ public class DyeListener implements Listener {
             return;
         }
         ItemStack handItem = event.getPlayer().getInventory().getItemInMainHand();
-        if (!EntityUtils.isDye(handItem)) {
+        if (!Utilities.isDye(handItem)) {
             return;
         }
         Sheep sheep = (Sheep) event.getRightClicked();
         StackEntity stackEntity = sm.getEntityManager().getStackEntity(sheep);
-        if (stackEntity.isSingle()) {
+        if (stackEntity == null || stackEntity.isSingle()) {
             return;
         }
-        switch (sm.getMainConfig().getListenerMode(sheep.getType(), "dye")) {
-            case SPLIT:
-                StackEntity slice = stackEntity.slice();
-                ((Colorable) slice.getEntity()).setColor(sheep.getColor());
-                break;
-            case MULTIPLY:
-                stackEntity.splitIfNotEnough(event.getPlayer().getInventory().getItemInMainHand().getAmount());
-                EntityUtils.removeHandItem(event.getPlayer(), stackEntity.getSize());
-                sheep.setColor(DyeColor.valueOf(handItem.getType().toString().replace("_DYE", "")));
-                break;
+        ListenerMode mode = sm.getMainConfig().getListenerMode(sheep.getType(), "dye");
+        if (mode == ListenerMode.SPLIT) {
+            ((Colorable) stackEntity.slice().getEntity()).setColor(sheep.getColor());
+            return;
         }
+        stackEntity.splitIfNotEnough(event.getPlayer().getInventory().getItemInMainHand().getAmount());
+        int limit = sm.getMainConfig().getEventMultiplyLimit(sheep.getType(), "dye", stackEntity.getSize());
+        if (stackEntity.getSize() > limit) {
+            stackEntity.slice(limit);
+        }
+        Utilities.removeHandItem(event.getPlayer(), stackEntity.getSize());
+        sheep.setColor(DyeColor.valueOf(handItem.getType().toString().replace("_DYE", "")));
     }
 }

@@ -14,13 +14,18 @@ import org.bukkit.persistence.PersistentDataType;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import uk.antiperson.stackmob.StackMob;
+import uk.antiperson.stackmob.commands.User;
 import uk.antiperson.stackmob.entity.StackEntity;
+
+import java.util.HashSet;
+import java.util.Set;
 
 public class StackingTool {
 
     private final Player player;
     private final ItemStack itemStack;
     private final StackMob sm;
+
     public StackingTool(StackMob sm, Player player) {
         this.sm = sm;
         this.player = player;
@@ -33,7 +38,7 @@ public class StackingTool {
 
     public ToolMode getMode() {
         for (ToolMode t : ToolMode.values()) {
-            if (t.getId() == getModeId()) {
+            if (t.ordinal() == getModeId()) {
                 return t;
             }
         }
@@ -42,80 +47,104 @@ public class StackingTool {
 
     public void shiftMode() {
         ItemMeta itemMeta = itemStack.getItemMeta();
-        int nextMode = (getModeId() + 1) > ToolMode.values().length ? 1 : getModeId() + 1;
+        int nextMode = (getModeId() + 1) >= ToolMode.values().length ? 0 : getModeId() + 1;
         itemMeta.getPersistentDataContainer().set(sm.getToolKey(), PersistentDataType.INTEGER, nextMode);
         itemStack.setItemMeta(itemMeta);
         player.getInventory().setItemInMainHand(itemStack);
         player.spigot().sendMessage(ChatMessageType.ACTION_BAR, TextComponent.fromLegacyText("Shifted mode to " + getMode()));
     }
 
-    public void performAction(StackEntity clicked) {
+    public void performAction(LivingEntity clicked) {
+        User user = new User(player);
+        if (!sm.getEntityManager().isStackedEntity(clicked)) {
+            if (getMode() != ToolMode.MODIFY) {
+                user.sendError("You cannot use " + getMode() + " on an unstacked entity!");
+                return;
+            }
+            startConversation(clicked);
+            return;
+        }
+        StackEntity stackEntity = sm.getEntityManager().getStackEntity(clicked);
         switch (getMode()) {
             case MODIFY:
-                ConversationFactory factory = new ConversationFactory(sm)
-                        .withTimeout(25)
-                        .withFirstPrompt(new ModifyPrompt(clicked))
-                        .withLocalEcho(false)
-                        .withPrefix(conversationContext -> Utilities.PREFIX)
-                        .addConversationAbandonedListener(new ExitPrompt());
-                Conversation conversation = factory.buildConversation(player);
-                conversation.begin();
-                break;
+                startConversation(clicked);
+                return;
             case SLICE:
-                if (!clicked.isSingle()) {
-                    clicked.slice();
-                    clicked.removeStackData();
-                    break;
+            case SLICE_ALL:
+                if (stackEntity.isSingle()) {
+                    user.sendError("Entity is single, therefore it cannot be sliced!");
+                    return;
                 }
-                player.sendMessage("Entity is single so cannot be sliced!");
+                int sliceNo = getMode() == ToolMode.SLICE ? 1 : stackEntity.getSize() - 1;
+                StackEntity slice = stackEntity;
+                Set<StackEntity> slices = new HashSet<>();
+                for (int i = 0; i < sliceNo; i++) {
+                    slice = slice.slice();
+                    slices.add(slice);
+                }
+                stackEntity.removeStackData();
+                if (getMode() == ToolMode.SLICE_ALL) {
+                    slices.forEach(sliced -> sliced.setForgetOnSpawn(true));
+                }
                 break;
             case REMOVE_CHUNK:
-                for (Entity e : clicked.getEntity().getChunk().getEntities()) {
+                for (Entity e : clicked.getChunk().getEntities()) {
                     if (!(e instanceof Mob)) {
                         continue;
                     }
                     if (!sm.getEntityManager().isStackedEntity((LivingEntity) e)) {
                         continue;
                     }
-                    StackEntity stackEntity = sm.getEntityManager().getStackEntity((LivingEntity) e);
-                    stackEntity.removeStackData();
+                    StackEntity nearby = sm.getEntityManager().getStackEntity((LivingEntity) e);
+                    nearby.removeStackData();
                 }
                 break;
             case REMOVE_SINGLE:
-                clicked.removeStackData();
+                stackEntity.removeStackData();
                 break;
         }
+        user.sendSuccess("Action performed successfully.");
+    }
+
+    private void startConversation(LivingEntity stackEntity) {
+        ConversationFactory factory = new ConversationFactory(sm)
+                .withTimeout(25)
+                .withFirstPrompt(new ModifyPrompt(stackEntity))
+                .withLocalEcho(false)
+                .withPrefix(conversationContext -> Utilities.PREFIX)
+                .addConversationAbandonedListener(new ExitPrompt());
+        Conversation conversation = factory.buildConversation(player);
+        conversation.begin();
     }
 
     enum ToolMode {
-        MODIFY(1),
-        SLICE(2),
-        REMOVE_SINGLE(3),
-        REMOVE_CHUNK(4);
-
-        private final int id;
-        ToolMode(int id) {
-            this.id = id;
-        }
-
-        public int getId() {
-            return id;
-        }
+        MODIFY,
+        SLICE,
+        SLICE_ALL,
+        REMOVE_SINGLE,
+        REMOVE_CHUNK
     }
 
     private class ModifyPrompt extends NumericPrompt {
 
-        private final StackEntity stackEntity;
-        public ModifyPrompt(StackEntity stackEntity) {
-            this.stackEntity = stackEntity;
+        private final LivingEntity livingEntity;
+        private final int maxSize;
+
+        public ModifyPrompt(LivingEntity livingEntity) {
+            this.livingEntity = livingEntity;
+            this.maxSize = sm.getMainConfig().getMaxStack(livingEntity.getType());
         }
 
         @Nullable
         @Override
         protected Prompt acceptValidatedInput(@NotNull ConversationContext conversationContext, @NotNull Number number) {
-            if (stackEntity.getEntity().isDead()) {
+            if (livingEntity.isDead()) {
                 conversationContext.getForWhom().sendRawMessage(Utilities.PREFIX + ChatColor.RED + "Entity is no longer valid. Modification has been cancelled.");
                 return Prompt.END_OF_CONVERSATION;
+            }
+            StackEntity stackEntity = sm.getEntityManager().getStackEntity(livingEntity);
+            if (stackEntity == null) {
+                stackEntity = sm.getEntityManager().registerStackedEntity(livingEntity);
             }
             stackEntity.setSize(number.intValue());
             conversationContext.getForWhom().sendRawMessage(Utilities.PREFIX + ChatColor.GREEN + "Stack value has been updated.");
@@ -131,18 +160,15 @@ public class StackingTool {
         @Nullable
         @Override
         protected String getFailedValidationText(@NotNull ConversationContext context, @NotNull String invalidInput) {
-            return Utilities.PREFIX + ChatColor.RED + "Invalid input. Accepted sizes: 1-" + stackEntity.getMaxSize();
+            return Utilities.PREFIX + ChatColor.RED + "Invalid input. Accepted sizes: 1-" + maxSize;
         }
 
         @Override
         protected boolean isNumberValid(@NotNull ConversationContext context, @NotNull Number input) {
-            if (input.intValue() > stackEntity.getMaxSize()) {
+            if (input.intValue() > maxSize) {
                 return false;
             }
-            if (input.intValue() < 1) {
-                return false;
-            }
-            return true;
+            return !(input.intValue() < 1);
         }
     }
 

@@ -2,6 +2,7 @@ package uk.antiperson.stackmob.hook;
 
 import org.bukkit.Location;
 import org.bukkit.entity.LivingEntity;
+import org.bukkit.event.Listener;
 import uk.antiperson.stackmob.StackMob;
 import uk.antiperson.stackmob.entity.StackEntity;
 import uk.antiperson.stackmob.hook.hooks.*;
@@ -13,11 +14,12 @@ import java.util.HashSet;
 
 public class HookManager {
 
-    private final HashSet<Hook> hooks = new HashSet<>();
+    private final HashSet<Hook> hooks;
     private final StackMob sm;
     private ProtocolLibHook protocolLibHook;
     public HookManager(StackMob sm) {
         this.sm = sm;
+        hooks = new HashSet<>();
     }
 
     /**
@@ -42,11 +44,14 @@ public class HookManager {
      */
     public void registerHooks() throws InstantiationException, IllegalAccessException, NoSuchMethodException, InvocationTargetException {
         registerHook(WorldGuardHook.class);
-        registerHook(MythicMobsHook.class);
+        registerHook(MythicMobsStackHook.class);
+        registerHook(MythicMobsNoStackHook.class);
         registerHook(McmmoHook.class);
         registerHook(CitizensHook.class);
         registerHook(JobsHook.class);
         registerHook(ProtocolLibHook.class);
+        registerHook(ClearlaggHook.class);
+        registerHook(MyPetHook.class);
     }
 
     /**
@@ -66,6 +71,9 @@ public class HookManager {
             return;
         }
         Hook hook = createInstance(hookClass);
+        if (hook instanceof Listener) {
+            sm.getServer().getPluginManager().registerEvents((Listener) hook, sm);
+        }
         hook.onEnable();
         hooks.add(hook);
     }
@@ -80,7 +88,7 @@ public class HookManager {
      * @throws InstantiationException if the class is abstract
      */
     private Hook createInstance(Class<? extends Hook> hookClass) throws NoSuchMethodException, IllegalAccessException, InvocationTargetException, InstantiationException {
-        for (Constructor constructor : hookClass.getDeclaredConstructors()) {
+        for (Constructor<?> constructor : hookClass.getDeclaredConstructors()) {
             for (Parameter parameter : constructor.getParameters()) {
                 if (parameter.getType().isAssignableFrom(StackMob.class)) {
                     return hookClass.getDeclaredConstructor(StackMob.class).newInstance(sm);
