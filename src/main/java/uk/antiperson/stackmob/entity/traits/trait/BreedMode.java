@@ -1,20 +1,19 @@
 package uk.antiperson.stackmob.entity.traits.trait;
 
 import org.bukkit.entity.Animals;
-import org.bukkit.entity.LivingEntity;
 import uk.antiperson.stackmob.entity.traits.Trait;
 import uk.antiperson.stackmob.entity.traits.TraitMetadata;
 
-@TraitMetadata(entity = Animals.class, path = "breed-mode")
-public class BreedMode implements Trait {
+@TraitMetadata(path = "breed-mode")
+public class BreedMode implements Trait<Animals> {
 
     @Override
-    public boolean checkTrait(LivingEntity first, LivingEntity nearby) {
-        return ((Animals) first).canBreed() != ((Animals) nearby).canBreed();
+    public boolean checkTrait(Animals first, Animals nearby) {
+        return first.canBreed() != nearby.canBreed();
     }
 
     @Override
-    public void applyTrait(LivingEntity spawned, LivingEntity dead) {
-        ((Animals) spawned).setBreed(((Animals) dead).canBreed());
+    public void applyTrait(Animals spawned, Animals dead) {
+        spawned.setBreed(dead.canBreed());
     }
 }

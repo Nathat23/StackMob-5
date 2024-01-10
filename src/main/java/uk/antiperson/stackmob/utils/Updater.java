@@ -48,7 +48,7 @@ public class Updater {
     public CompletableFuture<Utilities.DownloadResult> downloadUpdate() {
         File currentFile = new File(sm.getClass().getProtectionDomain().getCodeSource().getLocation().getPath());
         File updateFile = new File(sm.getServer().getUpdateFolderFile(), currentFile.getName());
-        return Utilities.downloadFile(updateFile, "http://aqua.api.spiget.org/v2/resources/" + resourceId + "/download");
+        return Utilities.downloadFile(updateFile, "https://api.spiget.org/v2/resources/" + resourceId + "/download");
     }
 
     public enum VersionResult {

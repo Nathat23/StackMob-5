@@ -1,18 +1,23 @@
 package uk.antiperson.stackmob.commands;
 
-import org.bukkit.ChatColor;
+import net.kyori.adventure.audience.Audience;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.command.CommandSender;
 import uk.antiperson.stackmob.utils.Utilities;
 
 public class User {
 
-    private final CommandSender sender;
-    public User(CommandSender sender) {
+    private final Audience sender;
+    private final CommandSender cmdSender;
+
+    public User(Audience sender, CommandSender cmdSender) {
         this.sender = sender;
+        this.cmdSender = cmdSender;
     }
 
     public void sendRawMessage(String message) {
-        sender.sendMessage(message);
+        sender.sendMessage(Component.text(message));
     }
 
     public void sendInfo(String message) {
@@ -28,24 +33,26 @@ public class User {
     }
 
     public CommandSender getSender() {
-        return sender;
+        return cmdSender;
     }
 
-    private void sendMessage(MessageType type, String rawMessage) {
-        StringBuilder message = new StringBuilder(Utilities.PREFIX);
+    private void sendMessage(MessageType type, String string) {
+        sendMessage(type, Component.text(string));
+    }
+
+    private void sendMessage(MessageType type, Component component) {
         switch (type) {
             case INFO:
-                message.append(ChatColor.YELLOW);
+                component = component.color(NamedTextColor.YELLOW);
                 break;
             case ERROR:
-                message.append(ChatColor.RED);
+                component = component.color(NamedTextColor.RED);
                 break;
             case SUCCESS:
-                message.append(ChatColor.GREEN);
+                component = component.color(NamedTextColor.GREEN);
                 break;
         }
-        message.append(rawMessage);
-        sender.sendMessage(message.toString());
+        sender.sendMessage(Utilities.PREFIX.append(component));
     }
 
     enum MessageType {

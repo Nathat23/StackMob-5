@@ -29,4 +29,9 @@ public class EntityTranslation extends ConfigFile {
         }
         save();
     }
+
+    @Override
+    public void reloadConfig() throws IOException {
+        load();
+    }
 }

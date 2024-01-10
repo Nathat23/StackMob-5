@@ -1,20 +1,19 @@
 package uk.antiperson.stackmob.entity.traits.trait;
 
-import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.MushroomCow;
 import uk.antiperson.stackmob.entity.traits.Trait;
 import uk.antiperson.stackmob.entity.traits.TraitMetadata;
 
-@TraitMetadata(entity = MushroomCow.class, path = "mooshroom-variant")
-public class MooshroomVariant implements Trait {
+@TraitMetadata(path = "mooshroom-variant")
+public class MooshroomVariant implements Trait<MushroomCow> {
 
     @Override
-    public boolean checkTrait(LivingEntity first, LivingEntity nearby) {
-        return ((MushroomCow) first).getVariant() != ((MushroomCow) nearby).getVariant();
+    public boolean checkTrait(MushroomCow first, MushroomCow nearby) {
+        return first.getVariant() != nearby.getVariant();
     }
 
     @Override
-    public void applyTrait(LivingEntity spawned, LivingEntity dead) {
-        ((MushroomCow) spawned).setVariant(((MushroomCow) dead).getVariant());
+    public void applyTrait(MushroomCow spawned, MushroomCow dead) {
+        spawned.setVariant(dead.getVariant());
     }
 }

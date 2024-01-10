@@ -8,6 +8,7 @@ public class ConfigList {
     private final String path;
     private final boolean inverted;
     private final ConfigFile configFile;
+
     public ConfigList(ConfigFile configFile, List<?> list, String path, boolean inverted) {
         this.configFile = configFile;
         this.list = list;
@@ -17,28 +18,26 @@ public class ConfigList {
 
     /**
      * List contains method which supports inverting lists.
-     * @param tocheck object to check is in the list
+     * @param item object to check is in the list
      * @return whether this object is in the list.
      */
-    public boolean contains(Object tocheck) {
+    public boolean contains(String item) {
         if (inverted){
-            return !list.contains(tocheck);
+            return !rawContains(item);
         }
-        return list.contains(tocheck);
+        return rawContains(item);
+    }
+
+    public boolean isInverted() {
+        return inverted;
+    }
+
+    public boolean rawContains(String item) {
+        return list.contains(item);
     }
 
     public List<Integer> asIntList() {
         return configFile.getIntegerList(path);
-    }
-
-    public static ConfigList getConfigList(ConfigFile configFile, ConfigValue value) {
-        List<?> list = (List<?>) value.getValue();
-        String path = value.getPath();
-        if (list == null) {
-            throw new UnsupportedOperationException(path + " list is null!");
-        }
-        boolean inverted = configFile.getBoolean(value.getPath() + "-invert");
-        return new ConfigList(configFile, list, path, inverted);
     }
 
 

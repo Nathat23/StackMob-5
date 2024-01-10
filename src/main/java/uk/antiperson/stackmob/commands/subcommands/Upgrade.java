@@ -19,7 +19,7 @@ public class Upgrade extends SubCommand {
         sm.getUpdater().downloadUpdate().whenComplete((downloadResult, throwable) -> {
             switch (downloadResult) {
                 case ERROR:
-                    sender.sendError("An error occurred while checking for updates.");
+                    sender.sendError("An error occurred while downloading the update.");
                     break;
                 case SUCCESSFUL:
                     sender.sendSuccess("The new update was downloaded successfully!");

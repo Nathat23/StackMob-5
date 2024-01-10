@@ -9,7 +9,7 @@ import uk.antiperson.stackmob.entity.StackEntity;
 public class StackDeathEvent extends StackEvent {
 
     private static final HandlerList handlers = new HandlerList();
-    private final int deathStep;
+    private int deathStep;
 
     public StackDeathEvent(StackEntity stackEntity, int deathStep) {
         super(stackEntity);
@@ -30,5 +30,18 @@ public class StackDeathEvent extends StackEvent {
      */
     public int getDeathStep() {
         return deathStep;
+    }
+
+    /**
+     * Set the amount of entities to be removed from the stack.
+     */
+    public void setDeathStep(int deathStep) {
+        if (deathStep < 0) {
+            throw new IllegalArgumentException("Death step must be greater than or equal to one.");
+        }
+        if (deathStep > getStackEntity().getSize()) {
+            throw new IllegalArgumentException("Death step cannot be greater than the size of the killed entity!");
+        }
+        this.deathStep = deathStep;
     }
 }

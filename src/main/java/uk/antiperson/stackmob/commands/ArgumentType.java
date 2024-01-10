@@ -4,5 +4,6 @@ public enum ArgumentType {
     BOOLEAN,
     STRING,
     INTEGER,
-    ENTITY_TYPE
+    ENTITY_TYPE,
+    WORLD
 }
