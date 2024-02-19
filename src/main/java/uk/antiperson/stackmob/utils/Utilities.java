@@ -23,6 +23,15 @@ import java.util.concurrent.CompletableFuture;
 
 public class Utilities {
 
+    public static final boolean IS_FOLIA;
+    static {
+        boolean f = false;
+        try {
+            Class.forName("io.papermc.paper.threadedregions.RegionizedServer");
+            f = true;
+        } catch (ClassNotFoundException ignored) {}
+        IS_FOLIA = f;
+    }
     public static final Component PREFIX = Component.text("StackMob ").color(TextColor.color(0, 206, 209)).append(Component.text(">> ").color(NamedTextColor.GRAY)).compact();
     public static final String PREFIX_STRING = LegacyComponentSerializer.legacySection().serialize(PREFIX);
     public static final String SLIME_METADATA = "deathcount";

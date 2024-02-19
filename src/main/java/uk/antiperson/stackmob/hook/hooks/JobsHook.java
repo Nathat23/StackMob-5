@@ -13,6 +13,7 @@ import uk.antiperson.stackmob.entity.StackEntity;
 import uk.antiperson.stackmob.hook.Hook;
 import uk.antiperson.stackmob.hook.HookMetadata;
 import uk.antiperson.stackmob.hook.SpawnHook;
+import uk.antiperson.stackmob.utils.Utilities;
 
 @HookMetadata(name = "Jobs", config = "jobs.enabled")
 public class JobsHook extends Hook implements SpawnHook, Listener {
@@ -29,7 +30,7 @@ public class JobsHook extends Hook implements SpawnHook, Listener {
 
     @EventHandler
     public void onJobsPrePayment(JobsPrePaymentEvent event) {
-        if (event.getLivingEntity() == null) {
+        if (event.getLivingEntity() == null || Utilities.IS_FOLIA) { // TODO: Make this work with Folia.
             return;
         }
         stackEntity = sm.getEntityManager().getStackEntity(event.getLivingEntity());

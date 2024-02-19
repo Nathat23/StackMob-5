@@ -53,7 +53,7 @@ public class DeathListener implements Listener {
             } else {
                 stackEntity.removeStackData();
                 int finalDeathStep = deathStep;
-                sm.getServer().getScheduler().runTask(sm, () -> {
+                sm.getScheduler().runTask(sm, event.getEntity(), () -> {
                     StackEntity spawned = stackEntity.duplicate();
                     spawned.setSize(stackEntity.getSize() - finalDeathStep);
                     deathMethod.onSpawn(spawned);

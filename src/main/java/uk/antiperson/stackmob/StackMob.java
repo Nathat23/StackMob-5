@@ -17,6 +17,9 @@ import uk.antiperson.stackmob.entity.traits.TraitManager;
 import uk.antiperson.stackmob.hook.HookManager;
 import uk.antiperson.stackmob.listeners.*;
 import uk.antiperson.stackmob.packets.PlayerManager;
+import uk.antiperson.stackmob.scheduler.BukkitScheduler;
+import uk.antiperson.stackmob.scheduler.FoliaScheduler;
+import uk.antiperson.stackmob.scheduler.Scheduler;
 import uk.antiperson.stackmob.tasks.MergeTask;
 import uk.antiperson.stackmob.tasks.TagCheckTask;
 import uk.antiperson.stackmob.tasks.TagMoveTask;
@@ -43,6 +46,7 @@ public class StackMob extends JavaPlugin {
     private ItemTools itemTools;
     private PlayerManager playerManager;
     private BukkitAudiences adventure;
+    private Scheduler scheduler;
 
     private boolean stepDamageError;
 
@@ -55,6 +59,7 @@ public class StackMob extends JavaPlugin {
             getLogger().log(Level.SEVERE, "There was a problem registering hooks. Features won't work.");
             e.printStackTrace();
         }
+        scheduler = Utilities.IS_FOLIA ? new FoliaScheduler() : new BukkitScheduler();
     }
 
     @Override
@@ -96,11 +101,11 @@ public class StackMob extends JavaPlugin {
         command.setTabCompleter(commands);
         commands.registerSubCommands();
         int stackInterval = getMainConfig().getConfig().getStackInterval();
-        new MergeTask(this).runTaskTimer(this, 20, stackInterval);
+        getScheduler().runGlobalTaskTimer(this, new MergeTask(this), 20, stackInterval);
         int tagInterval = getMainConfig().getConfig().getTagNearbyInterval();
-        new TagCheckTask(this).runTaskTimer(this, 30, tagInterval);
+        getScheduler().runGlobalTaskTimer(this, new TagCheckTask(this), 30, tagInterval);
         if (getMainConfig().getConfig().isUseArmorStand()) {
-            new TagMoveTask(this).runTaskTimer(this, 10, 1);
+            getScheduler().runGlobalTaskTimer(this, new TagMoveTask(this), 10, 1);
         }
         getLogger().info("Detected server version " + Utilities.getMinecraftVersion());
         if (getHookManager().getProtocolLibHook() == null) {
@@ -224,5 +229,9 @@ public class StackMob extends JavaPlugin {
 
     public void setStepDamageError(boolean stepDamageError) {
         this.stepDamageError = stepDamageError;
+    }
+
+    public Scheduler getScheduler() {
+        return scheduler;
     }
 }
