@@ -18,8 +18,8 @@ public class Reload extends SubCommand {
     @Override
     public boolean onCommand(User sender, String[] args) {
         try {
-            sm.getEntityTranslation().load();
-            sm.getMainConfig().load();
+            sm.getEntityTranslation().reloadConfig();
+            sm.getMainConfig().reload();
             sender.sendSuccess("Reloaded config files successfully!");
             sender.sendInfo("Note: Some config changes may require a full server restart to take effect.");
         } catch (IOException e) {

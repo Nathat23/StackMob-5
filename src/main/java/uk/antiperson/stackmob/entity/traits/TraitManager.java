@@ -1,24 +1,29 @@
 package uk.antiperson.stackmob.entity.traits;
 
+import org.bukkit.entity.EntityType;
 import org.bukkit.entity.LivingEntity;
-import org.bukkit.entity.Piglin;
 import uk.antiperson.stackmob.StackMob;
 import uk.antiperson.stackmob.entity.StackEntity;
 import uk.antiperson.stackmob.entity.traits.trait.*;
 import uk.antiperson.stackmob.utils.Utilities;
 
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.ParameterizedType;
+import java.util.EnumMap;
 import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
 
 public class TraitManager {
 
-    private final HashSet<Trait> traits;
+    private final Map<EntityType, Set<Trait<LivingEntity>>> traits;
     private final StackMob sm;
     public TraitManager(StackMob sm) {
         this.sm = sm;
-        this.traits = new HashSet<>();
+        this.traits = new EnumMap<>(EntityType.class);
     }
 
-    public void registerTraits() throws InstantiationException, IllegalAccessException {
+    public void registerTraits() throws InstantiationException, IllegalAccessException, InvocationTargetException, NoSuchMethodException {
         registerTrait(SheepColor.class);
         registerTrait(SheepShear.class);
         registerTrait(HorseColor.class);
@@ -35,25 +40,41 @@ public class TraitManager {
         registerTrait(ZombieBaby.class);
         registerTrait(BeeNectar.class);
         registerTrait(BeeStung.class);
-        if (!Utilities.isNewBukkit()) {
-            return;
+        registerTrait(Leash.class);
+        registerTrait(Potion.class);
+        registerTrait(VillagerProfession.class);
+        if (Utilities.isPaper()) {
+            registerTrait(TurtleHasEgg.class);
         }
         registerTrait(ZoglinBaby.class);
         registerTrait(PiglinBaby.class);
+        if (Utilities.isVersionAtLeast(Utilities.MinecraftVersion.V1_19_4)) {
+            registerTrait(FrogVariant.class);
+            registerTrait(AllayOwner.class);
+        }
     }
 
     /**
      * If a class hasn't been disabled in the config, add this to the hashset so it can be looped over.
      *
-     * TODO: Perhaps there could be a hashset which contains a list of entity types that should be checked.
-     * @param trait class that implements trait
+     * @param traitClass class that implements trait
      * @throws IllegalAccessException if class is not accessible
      * @throws InstantiationException if class can not be instantiated
+     * @throws NoSuchMethodException if class constructor can not be found
+     * @throws InvocationTargetException if instantiation fails
      */
-    private void registerTrait(Class<? extends Trait> trait) throws IllegalAccessException, InstantiationException {
-        TraitMetadata traitMetadata = trait.getAnnotation(TraitMetadata.class);
-        if (sm.getMainConfig().isTraitEnabled(traitMetadata.path()) || sm.getMainConfig().getBoolean(traitMetadata.path())) {
-            traits.add(trait.newInstance());
+    private <T extends Trait<? extends LivingEntity>> void registerTrait(Class<T> traitClass) throws IllegalAccessException, InstantiationException, NoSuchMethodException, InvocationTargetException {
+        final TraitMetadata traitMetadata = traitClass.getAnnotation(TraitMetadata.class);
+        if (!sm.getMainConfig().getConfig().isTraitEnabled(traitMetadata.path())) {
+            return;
+        }
+        Trait<LivingEntity> trait = (Trait<LivingEntity>) traitClass.getDeclaredConstructor().newInstance();
+        ParameterizedType parameterizedType = (ParameterizedType) trait.getClass().getGenericInterfaces()[0];
+        Class<? extends LivingEntity> typeArgument = (Class<? extends LivingEntity>) parameterizedType.getActualTypeArguments()[0];
+        for (EntityType entityType : EntityType.values()) {
+            if (entityType.getEntityClass() != null && typeArgument.isAssignableFrom(entityType.getEntityClass())) {
+                traits.computeIfAbsent(entityType, type -> new HashSet<>()).add(trait);
+            }
         }
     }
 
@@ -64,11 +85,13 @@ public class TraitManager {
      * @return if these entities have any not matching characteristics (traits.)
      */
     public boolean checkTraits(StackEntity first, StackEntity nearby) {
-        for (Trait trait : traits) {
-            if (isTraitApplicable(trait, first.getEntity())) {
-                if (trait.checkTrait(first.getEntity(), nearby.getEntity())) {
-                    return true;
-                }
+        Set<Trait<LivingEntity>> set = traits.get(first.getEntity().getType());
+        if (set == null) {
+            return false;
+        }
+        for (Trait<LivingEntity> trait : set) {
+            if (trait.checkTrait(first.getEntity(), nearby.getEntity())) {
+                return true;
             }
         }
         return false;
@@ -80,21 +103,12 @@ public class TraitManager {
      * @param dead the entity which traits should be copied from.
      */
     public void applyTraits(StackEntity spawned, StackEntity dead) {
-        for (Trait trait : traits) {
-            if (isTraitApplicable(trait, spawned.getEntity())) {
-                trait.applyTrait(spawned.getEntity(), dead.getEntity());
-            }
+        Set<Trait<LivingEntity>> set = traits.get(spawned.getEntity().getType());
+        if (set == null) {
+            return;
         }
-    }
-
-    /**
-     * Check if the trait is applicable to the given entity.
-     * @param trait the trait to check.
-     * @param entity the entity to check.
-     * @return if the trait is applicable to the given entity.
-     */
-    private boolean isTraitApplicable(Trait trait, LivingEntity entity) {
-        TraitMetadata traitMetadata = trait.getClass().getAnnotation(TraitMetadata.class);
-        return traitMetadata.entity().isAssignableFrom(entity.getClass());
+        for (Trait<LivingEntity> trait : set) {
+            trait.applyTrait(spawned.getEntity(), dead.getEntity());
+        }
     }
 }

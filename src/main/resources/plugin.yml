@@ -1,14 +1,16 @@
 name: StackMob
 main: uk.antiperson.stackmob.StackMob
 version: ${project.version}
-api-version: 1.15
-softdepend: [WorldGuard, MythicMobs, ProtocolLib]
+api-version: 1.16
+folia-supported: true
+depend: [ProtocolLib]
+softdepend: [WorldGuard, MythicMobs, ClearLag, MyPet, mcMMO, Jobs, Citizens]
 author: antiPerson
 website: https://www.spigotmc.org/resources/stackmob-enhance-your-servers-performance-without-the-sacrifice.29999/
-description: A plugin that aims to improve performance by 'stacking' entities together, with attempts to perserve game mechanics.
+description: A plugin that aims to improve performance by 'stacking' entities together, with attempts to preserve game mechanics.
 commands:
   stackmob:
     aliases: [sm]
     permission: stackmob.admin
-    description: The main command of stackmob, which allows for maniplulation of stacks.
+    description: The main command of stackmob, which allows for manipulation of stacks.
     permission-message: No permission!

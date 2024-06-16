@@ -1,11 +1,17 @@
-# StackMob 5.0 Configuration file - by antiPerson and contributors.
+# StackMob ${project.version} Configuration file - by antiPerson and contributors.
+# If the comments have been removed, you can find a version with comments at https://github.com/Nathat23/StackMob-5/tree/master/src/main/resources
 #
 # Most options can be customised for specific entity types, for details about this, see the end of this file.
 # Asterisk meaning:
 # (*) This option cannot be overridden in the 'custom' section at the end of this file.
 # (**) The following option requires the use of Paper (https://papermc.io) because the API needed is not in Spigot.
-#
-# If the comments have been removed, you can find a version with comments at https://github.com/Nathat23/StackMob-5/tree/master/src/main/resources
+# (***) You can use group names for entities. These are: HOSTILE, ANIMALS, WATER, RAIDER, BOSS
+# Spigot JavaDoc Reference:
+# (1) https://hub.spigotmc.org/javadocs/spigot/org/bukkit/event/entity/EntityDamageEvent.DamageCause.html
+# (2) https://hub.spigotmc.org/javadocs/spigot/org/bukkit/event/entity/CreatureSpawnEvent.SpawnReason.html
+# (3) https://hub.spigotmc.org/javadocs/spigot/org/bukkit/entity/EntityType.html
+# (4) https://hub.spigotmc.org/javadocs/spigot/org/bukkit/Material.html
+# (5) https://hub.spigotmc.org/javadocs/bukkit/org/bukkit/event/entity/EntityKnockbackEvent.KnockbackCause.html
 
 stack:
   # The maximum size that a stack can have.
@@ -19,28 +25,50 @@ stack:
   threshold:
     enabled: true
     amount: 5
+  # Only find matches for this mob if it has moved from the last time nearby mobs were checked. (*)
+  # This may have unintended effects, so you should do some testing when modifying this section.
+  check-location:
+    enabled: true
+    # The distance threshold for the check
+    distance: 1.0
+    # Even if the entity hasn't moved, after (x) attempts then attempt a merge.
+    timeout: 20
+  # Stack entities when they spawn. (*)
+  on-spawn: false
+  # Only stack when two stacks can directly see each other
+  line-of-sight: true
+  # What should be done if a nametagged entity is removed when stacking?
+  # DROP - drop a nametag
+  # JOIN - make it so that the value of the nametag is added to the remaining entity
+  #        NOTE: this will only work if display-name.mode is NEARBY amd display-name.nearby.use-armorstand is enabled!
+  # IGNORE - do nothing
+  # Also see events.nametag where you can define what happens when stacks are nametagged
+  nametag-mode: JOIN
 
 # Names of worlds where there should be no stacking
 worlds-blacklist: []
 worlds-blacklist-invert: false
-# Types of entity which should not stack
-types-blacklist: [VILLAGER]
+# Types of entity which should not stack (3) (***)
+types-blacklist: [VILLAGER, WATER, RAIDER]
 types-blacklist-invert: false
-# If the entity's spawns reason is listed below, do not stack.
-reason-blacklist: []
+# If the entity's spawn reason is listed below, do not stack. (2)
+reason-blacklist:
+  - SHOULDER_ENTITY
+  - NATURAL
 reason-blacklist-invert: false
 
 display-name:
   # The formatting of the name tag which is shown when the stack size is above the threshold.
+  # Both legacy and RGB hex color codes are supported, these need to be prefixed by the '&' symbol.
   # Placeholders:
   # %type% - the entity's type
   # %size% - the size of the stack
-  format: '&a%type% &d(%size%)'
+  format: '&#20B2AA%type% &#778899(%size%)'
   # Whether the display tag can only be seen when the player targets the entity.
   # Mode:
   # ALWAYS - The tag will always be visible as long as the entity is loaded.
   # HOVER - The tag will only be visible when the player hovers their crosshair on the entity.
-  # NEARBY - The tag will only be visible when the player is in range of the entity. (more resource intensive, requires ProtocolLib on 1.15 servers)
+  # NEARBY - The tag will only be visible when the player is in range of the entity. (more resource intensive)
   visibility: NEARBY
   # Options for when 'NEARBY' is used above. (*)
   nearby:
@@ -48,12 +76,23 @@ display-name:
     # Format: [(x cord),(y cord),(z cord)]
     range: [12,6,12]
     # How often (in ticks) the tag visibility status of an entity should be updated. (20 ticks = 1 second)
-    interval: 20
+    interval: 50
+    # Perform a ray trace, meaning that the tag is only visible if there are no occluding blocks.
+    ray-trace: true
+    # Use an armor stand (using packets) to display the tag, rather than renaming the entity.
+    # This allows the entity to be renamed using name tags
+    armorstand:
+      enabled: true
+      # Whether the armor stand should be spawned at a fixed offset from the head location.
+      # This is useful when other plugins use packets for entity name tags. If the value is 0.0 then this is disabled.
+      offset: 0.0
   # Don't show the tag if the stack size of this entity if it is equal to or below the value specified.
   threshold: 1
 
 # Whether entity specific traits (eg. profession, colour) should be segregated (*)
 traits:
+  allay-owner: true
+  frog-variant: true
   sheep-color: true
   sheep-sheared: true
   slime-size: true
@@ -71,86 +110,146 @@ traits:
   bee-stung: true
   zoglin-baby: true
   piglin-baby: true
+  leashed: true
+  villager-profession: true
+  potion-effect: true
+  # Prevent pregnant turtles from stacking. (**)
+  has-egg: true
 
 # Prevent stacked mobs from targeting players.
 # Similar to no-ai, but allows for movement of entities.
 disable-targeting:
   enabled: false
-  # If the entity's type is listed below, do not disable targeting.
+  # If the entity's type is listed below, do not disable targeting. (3) (***)
   type-blacklist: []
   type-blacklist-invert: false
-  # If the entity's spawns reason is listed below, do not disable targeting (**)
+  # If the entity's spawns reason is listed below, do not disable targeting (**) (2)
   reason-blacklist: []
   reason-blacklist-invert: false
 
+# Prevent stacked mobs from taking knockback.
+# Stacked mobs will still be able to move, but will stay still if knockback occurs
+disable-knockback:
+  enabled: false
+  # If the entity's type is listed below, do not disable knockback. (3) (***)
+  type-blacklist: []
+  type-blacklist-invert: false
+  # If the entity's spawns reason is listed below, do not disable knockback (**) (2)
+  reason-blacklist: []
+  reason-blacklist-invert: false
+  # If the cause of knockback is listed below, do not disable knockback (**) (5)
+  cause-blacklist: []
+  cause-blacklist-invert: false
+
 # What should be done when these entity actions occur. (*)
 events:
+  # When a nametag is used to rename a mob (see nametag)
+  nametag:
+    enabled: true
+    # SLICE - slice off an entity so that a single entity is named and becomes unstackable
+    # PREVENT - prevent nametags from working with stacked mobs
+    mode: SLICE
+  # When an entity picks up armor or other equipment
+  equip:
+    enabled: true
+    # IGNORE - do not take picked up equipment into consideration when stacking
+    # DROP_ITEMS - drop picked up items when about to stack
+    # PREVENT_STACK - do not stack this entity.
+    mode: IGNORE
   # When an entity is feed its food.
   breed:
     enabled: true
     # MULTIPLY - spawn as many baby entities possible providing there is enough food fed.
     # SPLIT - slice off an entity to that it can be bred normally.
     mode: MULTIPLY
+    # Limit the amount of baby entities spawned when using MULTIPLY mode. -1 = disabled.
+    limit: -1
   # When an entity is dyed.
   dye:
     enabled: true
     # MULTIPLY - dye as many entities possible providing there is enough dye.
     # SPLIT - slice off an entity to that it can be dyed normally.
     mode: MULTIPLY
+    # Limit the amount of sheep dyed when using MULTIPLY mode. -1 = disabled.
+    limit: -1
   # When an entity is sheared.
   shear:
     enabled: true
     # MULTIPLY - shear as many entities possible providing the shears have enough durability.
     # SPLIT - slice off an entity to that it can be sheared normally.
     mode: MULTIPLY
+    # Limit the amount of sheep sheared when using MULTIPLY mode. -1 = disabled.
+    limit: -1
+  # When an entity explodes.
+  explosion:
+    enabled: true
+    # MULTIPLY - increase the damage done by the explosion for each entity in the stack.
+    # SPLIT - slice off an entity so that only one entity explodes.
+    mode: MULTIPLY
+    # Limit the amount of damage dealt when using MULTIPLY mode. -1 = disabled.
+    limit: -1
   multiply:
     # Chicken eggs and turtle scutes.
     drops: true
-    explosion: true
     slime-split: true
   divide:
-    nametag: true
     tame: true
-  remove-stack-data:
-    # Should we remove the stack data of an entity that was unstacked as a result of nametag division/split?
-    # Setting this to false will cause entities that were nametagged to potentially become stacked again.
-    nametag: true
+    # Only bees currently.
+    enter-block: true
+    # Only fish currently.
+    bucket-fill: true
 
 # How entities should die
 death:
-  # Death options:
+  # Rather than spawn a new entity in place of the killed entity, just decrease the stack size instead. (**)
+  skip-animation: false
+  # Death amount options:
   # SINGLE - Only one entity dies.
   # ALL - Every entity dies.
   # STEP - A random amount dies.
   # STEP_DAMAGE - An amount that depends on the damage done dies.
   #
+  # Each death option has its own blacklist for entity traits:
+  # reason-blacklist - the last damage cause of the entity, which results in is death. (1)
+  # spawn-reason-blacklist - the spawn reason of the entity. (**) (2)
+  # type-blacklist - entity type. (***) (3)
+  #
   # The priority 1 is highest and 4 is lowest.
-  # If the killed entity is blacklisted, either by type or death reasons, by the highest priority method,
-  # then it will attempt to use the next highest priority death method.
+  # If the killed entity is blacklisted, either by type, spawn reason or death reasons (the last damage cause),
+  # by the highest priority method, then we will attempt to use the next highest priority death method.
   SINGLE:
-    priority: 4
+    priority: 2
     reason-blacklist: []
     reason-blacklist-invert: false
+    spawn-reason-blacklist: []
+    spawn-reason-blacklist-invert: false
     type-blacklist: []
     type-blacklist-invert: false
   ALL:
     priority: 3
     reason-blacklist: []
     reason-blacklist-invert: false
+    spawn-reason-blacklist: [ ]
+    spawn-reason-blacklist-invert: false
     type-blacklist: []
     type-blacklist-invert: false
   STEP:
-    priority: 2
+    priority: 1
     reason-blacklist: []
     reason-blacklist-invert: false
+    spawn-reason-blacklist: [ ]
+    spawn-reason-blacklist-invert: false
     type-blacklist: []
     type-blacklist-invert: false
     max-step: 5
     min-step: 1
+  # This mode is kind of buggy, especially when custom mob plugins are used.
   STEP_DAMAGE:
-    priority: 1
+    priority: 4
     reason-blacklist: []
     reason-blacklist-invert: false
+    spawn-reason-blacklist: [ ]
+    spawn-reason-blacklist-invert: false
     type-blacklist: []
     type-blacklist-invert: false
 
@@ -158,16 +257,16 @@ death:
 drops:
   enabled: true
   use-loot-tables: true
-  # If each mob should only drop one of the items in the list.
+  # If each mob should only drop one of the items in the list. (4)
   one-per-stack: []
   one-per-stack-invert: false
-  # Items that should not be dropped.
+  # Items that should not be dropped. (4)
   item-blacklist: []
   item-blacklist-invert: false
-  # Death reasons that should not mean that drops are multiplied.
+  # Death reasons that should not mean that drops are multiplied. (1)
   reason-blacklist: []
   reason-blacklist-invert: false
-  # Types of entity for which drops should not be dropped for.
+  # Types of entity for which drops should not be dropped for. (3) (***)
   type-blacklist: []
   type-blacklist-invert: false
 
@@ -177,7 +276,7 @@ experience:
   # The bounds that should be used for the random multiplier.
   multiplier-min: 0.5
   multiplier-max: 0.8
-  # Types of entity for which exp should not be dropped for.
+  # Types of entity for which exp should not be dropped for. (3)
   type-blacklist: []
   type-blacklist-invert: false
 
@@ -190,15 +289,15 @@ wait-to-stack:
   enabled: true
   # For (x) times the stack task fires after spawn, don't stack this entity.
   wait-time: 5
-  # Entity types that this should work for.
+  # Entity types that this should work for. (3) (***)
   types-whitelist:
     - ZOMBIE
     - SKELETON
-    - PIG_ZOMBIE
+    - ZOMBIFIED_PIGLIN
     - CREEPER
     - ENDERMAN
   types-whitelist-invert: false
-  # Spawn reasons that this should work for.
+  # Spawn reasons that this should work for. (2)
   reasons-whitelist:
     - SPAWNER
   reasons-whitelist-invert: false
@@ -208,17 +307,31 @@ hooks:
   # Allows the custom 'entity-stacking' flag to be used in worldguard regions.
   worldguard: true
   mythicmobs:
-    enabled: true
-    blacklist: []
-    blacklist-invert: false
+    stack: false
+    # Blacklist of MythicMob types (uses the internal name)
+    # This blacklist does not take effect if the prevent-stack option is enabled below.
+    stack-blacklist: [ ]
+    stack-blacklist-invert: false
+    # When this option is enabled, MythicMobs will not stack.
+    prevent-stack: true
   # Prevent citizens npcs from stacking.
   citizens: true
   # Prevent stacked entities from giving mcmmo experience.
   mcmmo: true
-  # Prevent stacked entities from giving job payments.
-  jobs: true
+  # Options relating to the Jobs Reborn plugin
+  jobs:
+    enabled: true
+    # Modes:
+    # PREVENT - Do not give Jobs rewards for stacked mobs.
+    # IGNORE - Make it so StackMob doesn't touch Jobs.
+    # MULTIPLY - Multiply rewards for stacked mobs.
+    mode: PREVENT
   # Allows the use of ProtocolLib, which is used when the server version is not the native one of the plugin.
   protocollib: true
+  # Make it so that ClearLagg removes stacked entities.
+  clearlagg: false
+  # Make it so that MyPet pets do not stack.
+  mypet: true
 
 ## Some options can be modified for specific entity types. An example is shown below. Remove comments to see this in action.
 ## Options and sections with a (*) in the comment preceding cannot be overridden.
@@ -234,5 +347,3 @@ hooks:
 #    # The cloned custom options can still be overridden.
 #    stack:
 #      max-size: 5
-
-

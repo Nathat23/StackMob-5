@@ -1,19 +1,18 @@
 package uk.antiperson.stackmob.entity.traits.trait;
 
 import org.bukkit.entity.Bee;
-import org.bukkit.entity.LivingEntity;
 import uk.antiperson.stackmob.entity.traits.Trait;
 import uk.antiperson.stackmob.entity.traits.TraitMetadata;
 
-@TraitMetadata(entity = Bee.class, path = "bee-nectar")
-public class BeeNectar implements Trait {
+@TraitMetadata(path = "bee-nectar")
+public class BeeNectar implements Trait<Bee> {
     @Override
-    public boolean checkTrait(LivingEntity first, LivingEntity nearby) {
-        return ((Bee) first).hasNectar() != ((Bee) nearby).hasNectar();
+    public boolean checkTrait(Bee first, Bee nearby) {
+        return first.hasNectar() != nearby.hasNectar();
     }
 
     @Override
-    public void applyTrait(LivingEntity spawned, LivingEntity dead) {
-        ((Bee) spawned).setHasNectar(((Bee) dead).hasNectar());
+    public void applyTrait(Bee spawned, Bee dead) {
+        spawned.setHasNectar(spawned.hasNectar());
     }
 }

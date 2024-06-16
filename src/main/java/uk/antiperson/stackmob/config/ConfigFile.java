@@ -14,8 +14,9 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 import java.util.List;
+import java.util.Set;
 
-public class ConfigFile {
+public abstract class ConfigFile implements Config {
 
     private File file;
     private FileConfiguration fileCon;
@@ -47,7 +48,12 @@ public class ConfigFile {
     }
 
     public ConfigList getList(String path) {
-        return ConfigList.getConfigList(this, new ConfigValue(path, get(path)));
+        List<?> list = fileCon.getList(path);
+        if (list == null) {
+            throw new UnsupportedOperationException(path + " list is null!");
+        }
+        boolean inverted = getBoolean(path + "-invert");
+        return new ConfigList(this, list, path, inverted);
     }
 
     public ConfigurationSection getConfigurationSection(String path) {
@@ -76,6 +82,10 @@ public class ConfigFile {
 
     public void set(String path, Object value) {
         fileCon.set(path, value);
+    }
+
+    public Set<String> getKeys(boolean deep) {
+        return fileCon.getKeys(deep);
     }
 
     /**
@@ -109,7 +119,7 @@ public class ConfigFile {
         // The files copy below will throw an error if the directories are not pre existing.
         file = new File(sm.getDataFolder(), filePath);
         File parentFile = file.getParentFile();
-        if(!parentFile.exists()){
+        if (!parentFile.exists()) {
             Files.createDirectories(parentFile.toPath());
         }
         // Open the file and copy it to the plugin folder.
@@ -140,15 +150,20 @@ public class ConfigFile {
                 continue;
             }
             fileCon.set(key, includedConfig.get(key));
+            if (Utilities.isVersionAtLeast(Utilities.MinecraftVersion.V1_18_2)) {
+                fileCon.setComments(key, includedConfig.getComments(key));
+            }
             updated = true;
         }
         if (!updated) {
             return;
         }
         fileCon.options().header(includedConfig.options().header());
-        sm.getLogger().info("Config file " + file.getName() + " has been updated.");
-        sm.getLogger().info("Unfortunately, this means that comments have been removed.");
-        sm.getLogger().info("If you need comments, you access a version with them at " + Utilities.GITHUB_DEFAULT_CONFIG);
+        sm.getLogger().info("Config file " + file.getName() + " has been updated with new values.");
+        if (!Utilities.isVersionAtLeast(Utilities.MinecraftVersion.V1_18_2)) {
+            sm.getLogger().warning("This means that comments have been removed.");
+            sm.getLogger().info("If you need comments, you access a version with them at " + Utilities.GITHUB_DEFAULT_CONFIG);
+        }
         save();
     }
 

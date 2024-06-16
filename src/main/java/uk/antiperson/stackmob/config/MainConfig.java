@@ -1,213 +1,115 @@
 package uk.antiperson.stackmob.config;
 
-import org.bukkit.World;
+import org.bukkit.configuration.ConfigurationSection;
+import org.bukkit.entity.Entity;
 import org.bukkit.entity.EntityType;
-import org.bukkit.entity.LivingEntity;
-import org.bukkit.event.entity.CreatureSpawnEvent;
+import org.bukkit.entity.Mob;
 import uk.antiperson.stackmob.StackMob;
-import uk.antiperson.stackmob.entity.death.DeathType;
-import uk.antiperson.stackmob.entity.TagMode;
-import uk.antiperson.stackmob.listeners.ListenerMode;
+import uk.antiperson.stackmob.entity.StackEntity;
 
 import java.io.IOException;
-import java.util.*;
+import java.util.EnumMap;
+import java.util.Map;
 
-public class MainConfig extends SpecialConfigFile {
+public class MainConfig {
 
+    private final Map<EntityType, EntityConfig> map;
+    private final MainConfigFile configFile;
     private final StackMob sm;
+
     public MainConfig(StackMob sm) {
-        super(sm, "config.yml");
         this.sm = sm;
+        this.map = new EnumMap<>(EntityType.class);
+        this.configFile = new MainConfigFile(sm);
     }
 
-    public int getMaxStack(EntityType type) {
-        return getInt(type, "stack.max-size");
-    }
-
-    public boolean getStackThresholdEnabled(EntityType type) {
-        return getBoolean(type, "stack.threshold.enabled");
-    }
-
-    public int getStackThreshold(EntityType type) {
-        return getInt(type, "stack.threshold.amount");
-    }
-
-    public Integer[] getStackRadius(EntityType type) {
-        return getList(type, "stack.merge-range").asIntList().toArray(new Integer[2]);
-    }
-
-    public int getStackInterval() {
-        return getInt("stack.interval");
-    }
-
-    public String getTagFormat(EntityType type) {
-        return getString(type, "display-name.format");
-    }
-
-    public int getTagThreshold(EntityType type) {
-        return getInt(type, "display-name.threshold");
-    }
-
-    public TagMode getTagMode(EntityType type) {
-        return TagMode.valueOf(getString(type, "display-name.visibility"));
-    }
-
-    public Integer[] getTagNeabyRadius() {
-        return getList("display-name.nearby.range").asIntList().toArray(new Integer[2]);
-    }
-
-    public int getTagNearbyInterval() {
-        return getInt("display-name.nearby.interval");
-    }
-
-    public boolean isTraitEnabled(String traitKey) {
-        return getBoolean("traits." + traitKey);
-    }
-
-    public boolean isHookEnabled(String traitKey) {
-        return getBoolean("hooks." + traitKey);
-    }
-
-    public boolean isDropMultiEnabled(EntityType type) {
-        return getBoolean(type, "drops.enabled");
-    }
-
-    public boolean isDropLootTables(EntityType type) {
-        return getBoolean(type, "drops.use-loot-tables");
-    }
-
-    public boolean isSlimeMultiEnabled(EntityType type) {
-        return getBoolean(type, "multiply.slime-split");
-    }
-
-    public ConfigList getDropTypeBlacklist(EntityType type) {
-        return getList(type, "drops.type-blacklist");
-    }
-
-    public ConfigList getDropReasonBlacklist(EntityType type) {
-        return getList(type, "drops.reason-blacklist");
-    }
-
-    public ConfigList getDropItemBlacklist(EntityType type) {
-        return getList(type, "drops.item-blacklist");
-    }
-
-    public ConfigList getDropItemOnePer(EntityType type) {
-        return getList(type, "drops.one-per-stack");
-    }
-
-    public boolean isExpMultiEnabled(EntityType type) {
-        return getBoolean(type, "experience.enabled");
-    }
-
-    public ConfigList getExpTypeBlacklist(EntityType type) {
-        return getList(type, "experience.type-blacklist");
-    }
-
-    public double getExpMinBound(EntityType type) {
-        return getDouble(type, "experience.multiplier-min");
-    }
-
-    public double getExpMaxBound(EntityType type) {
-        return getDouble(type, "experience.multiplier-max");
-    }
-
-    public boolean isPlayerStatMulti(EntityType type) {
-        return getBoolean(type, "player-stats");
-    }
-
-    public boolean isWaitingEnabled(EntityType type) {
-        return getBoolean(type, "wait-to-stack.enabled");
-    }
-
-    public ConfigList getWaitingTypes(EntityType type) {
-        return getList(type, "wait-to-stack.types-whitelist");
-    }
-
-    public ConfigList getWaitingReasons(EntityType type) {
-        return getList(type, "wait-to-stack.reasons-whitelist");
-    }
-
-    public int getWaitingTime(EntityType type) {
-        return getInt(type, "wait-to-stack.wait-time");
-    }
-
-    public int getMaxDeathStep(EntityType type) {
-        return getInt(type, "death.STEP.max-step");
-    }
-
-    public int getMinDeathStep(EntityType type) {
-        return getInt(type, "death.STEP.min-step");
-    }
-
-    public boolean isListenerEnabled(String eventKey) {
-        return getBoolean("events." + eventKey);
-    }
-
-    public boolean removeStackDataOnDivide(String reasonKey) { return getBoolean("events.remove-stack-data." + reasonKey); }
-
-    public boolean isTargetingDisabled(EntityType type) {
-        return getBoolean(type, "disable-targeting.enabled");
-    }
-
-    public ConfigList getTargetingDisabledTypes(EntityType type) {
-        return getList(type, "disable-targeting.type-blacklist");
-    }
-
-    public ConfigList getTargetingDisabledReasons(EntityType type) {
-        return getList(type, "disable-targeting.reason-blacklist");
-    }
-
-    public ListenerMode getListenerMode(EntityType type, String eventKey) {
-        return ListenerMode.valueOf(getString(type, "events." + eventKey + ".mode"));
-    }
-
-    public boolean isWorldBlacklisted(EntityType type, World world) {
-        return getList(type, "worlds-blacklist").contains(world.getName());
-    }
-
-    public boolean isEntityBlacklisted(LivingEntity entity, CreatureSpawnEvent.SpawnReason reason) {
-        if (getList(entity.getType(), "types-blacklist").contains(entity.getType().toString())) {
-            return true;
-        }
-        if (getList(entity.getType(), "reason-blacklist").contains(reason.toString())) {
-            return true;
-        }
-        return isWorldBlacklisted(entity.getType(), entity.getWorld());
-    }
-
-    public DeathType getDeathType(LivingEntity dead) {
-        for (String key : getDeathSection(dead)) {
-            ConfigList reasons = getList(dead.getType(), "death." + key + ".reason-blacklist");
-            if (reasons.contains(dead.getLastDamageCause().getCause().toString())) {
-                continue;
+    public void init() throws IOException {
+        configFile.load();
+        // iterate every entity type
+        for (EntityType entityType : EntityType.values()) {
+            if (entityType.getEntityClass() == null || !Mob.class.isAssignableFrom(entityType.getEntityClass())) {
+                if (entityType != EntityType.UNKNOWN) {
+                    continue;
+                }
             }
-            ConfigList types = getList(dead.getType(), "death." + key + ".type-blacklist");
-            if (types.contains(dead.getType().toString())) {
-                continue;
+            // create new EntityConfig for this entity type
+            EntityConfig entityConfig = new EntityConfig(sm, entityType);
+            // populate  with config contents
+            for (String key : configFile.getKeys(true)) {
+                if (key.startsWith("custom")) {
+                    continue;
+                }
+                entityConfig.put(key, new ConfigValue(configFile, key, configFile.get(key)));
             }
-            return DeathType.valueOf(key);
+            // store
+            map.put(entityType, entityConfig);
         }
-        throw new UnsupportedOperationException("Configuration error - unable to determine death type!");
-    }
-
-    private Collection<String> getDeathSection(LivingEntity dead) {
-        TreeMap<Integer, String> array = new TreeMap<>();
-        for (String key : getConfigurationSection("death").getKeys(false)) {
-            array.put(getInt(dead.getType(), "death." + key + ".priority"), key);
-        }
-        return array.values();
-    }
-
-    @Override
-    public void updateFile() throws IOException {
-        if (isSet("check-area.x")) {
-            sm.getLogger().info("Old config detected. Renaming to config.old and making a new one.");
-            makeOld();
-            sm.downloadBridge();
+        // now find which config items have been overridden
+        ConfigurationSection custom = configFile.getConfigurationSection("custom");
+        if (custom == null) {
             return;
         }
-        super.updateFile();
+        // get all the top level keys in the custom section
+        for (String key : custom.getKeys(false)) {
+            EntityType toRead = EntityType.valueOf(key);
+            // determine if we are cloning another section
+            EntityType cloneType = null;
+            String clone = custom.getString(toRead + ".clone", null);
+            if (clone != null && clone.length() > 0) {
+                cloneType = EntityType.valueOf(clone);
+            }
+            // get the entity config for this section
+            EntityConfig entityConfig = map.get(toRead);
+            // load all custom values (from the cloned entity type and this entity type) into the entity config
+            EntityType[] array = new EntityType[]{cloneType, toRead}; // order is important - cloned values may be overridden
+            for (EntityType type : array) {
+                if (type == null) {
+                    continue;
+                }
+                ConfigurationSection section = configFile.getConfigurationSection("custom." + type);
+                for (String customKey : section.getKeys(true)) {
+                    if (customKey.equals("clone")) {
+                        continue;
+                    }
+                    String actualKey = "custom." + type + "." + customKey;
+                    entityConfig.put(customKey, new ConfigValue(configFile, actualKey, section.get(customKey)));
+                }
+            }
+        }
     }
 
+    public void reload() throws IOException {
+        init();
+        sm.getEntityManager().getStackEntities().forEach(StackEntity::refreshConfig);
+    }
+
+    /**
+     * Returns the EntityConfig for the specified entity type
+     * @param type the type to check
+     * @return the EntityConfig for the specified entity type
+     */
+    public EntityConfig getConfig(EntityType type) {
+        return map.get(type);
+    }
+
+    /**
+     * Returns the EntityConfig for the specified entity
+     * @param entity the entity to check
+     * @return the EntityConfig for the specified entity
+     */
+    public EntityConfig getConfig(Entity entity) {
+        return getConfig(entity.getType());
+    }
+
+    /**
+     * Returns the EntityConfig whenever there is no entity present
+     * @return the EntityConfig whenever there is no entity present
+     */
+    public EntityConfig getConfig() {
+        return map.get(EntityType.UNKNOWN);
+    }
+
+    public MainConfigFile getConfigFile() {
+        return configFile;
+    }
 }

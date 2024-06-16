@@ -1,20 +1,19 @@
 package uk.antiperson.stackmob.entity.traits.trait;
 
 import org.bukkit.entity.Fox;
-import org.bukkit.entity.LivingEntity;
 import uk.antiperson.stackmob.entity.traits.Trait;
 import uk.antiperson.stackmob.entity.traits.TraitMetadata;
 
-@TraitMetadata(entity = Fox.class, path = "fox-type")
-public class FoxType implements Trait {
+@TraitMetadata(path = "fox-type")
+public class FoxType implements Trait<Fox> {
 
     @Override
-    public boolean checkTrait(LivingEntity first, LivingEntity nearby) {
-        return ((Fox) first).getFoxType() != ((Fox) nearby).getFoxType();
+    public boolean checkTrait(Fox first, Fox nearby) {
+        return first.getFoxType() != nearby.getFoxType();
     }
 
     @Override
-    public void applyTrait(LivingEntity spawned, LivingEntity dead) {
-        ((Fox) spawned).setFoxType(((Fox) dead).getFoxType());
+    public void applyTrait(Fox spawned, Fox dead) {
+        spawned.setFoxType(dead.getFoxType());
     }
 }

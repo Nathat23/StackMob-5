@@ -1,5 +1,6 @@
 package uk.antiperson.stackmob;
 
+import net.kyori.adventure.platform.bukkit.BukkitAudiences;
 import org.bstats.bukkit.Metrics;
 import org.bukkit.Bukkit;
 import org.bukkit.NamespacedKey;
@@ -15,8 +16,13 @@ import uk.antiperson.stackmob.entity.EntityManager;
 import uk.antiperson.stackmob.entity.traits.TraitManager;
 import uk.antiperson.stackmob.hook.HookManager;
 import uk.antiperson.stackmob.listeners.*;
+import uk.antiperson.stackmob.packets.PlayerManager;
+import uk.antiperson.stackmob.scheduler.BukkitScheduler;
+import uk.antiperson.stackmob.scheduler.FoliaScheduler;
+import uk.antiperson.stackmob.scheduler.Scheduler;
 import uk.antiperson.stackmob.tasks.MergeTask;
-import uk.antiperson.stackmob.tasks.TagTask;
+import uk.antiperson.stackmob.tasks.TagCheckTask;
+import uk.antiperson.stackmob.tasks.TagMoveTask;
 import uk.antiperson.stackmob.utils.ItemTools;
 import uk.antiperson.stackmob.utils.Updater;
 import uk.antiperson.stackmob.utils.Utilities;
@@ -29,7 +35,6 @@ import java.util.logging.Level;
 public class StackMob extends JavaPlugin {
 
     private final NamespacedKey stackKey = new NamespacedKey(this, "stack-size");
-    private final NamespacedKey waitKey = new NamespacedKey(this, "wait-key");
     private final NamespacedKey toolKey = new NamespacedKey(this, "stack-tool");
 
     private MainConfig config;
@@ -39,6 +44,11 @@ public class StackMob extends JavaPlugin {
     private EntityManager entityManager;
     private Updater updater;
     private ItemTools itemTools;
+    private PlayerManager playerManager;
+    private BukkitAudiences adventure;
+    private Scheduler scheduler;
+
+    private boolean stepDamageError;
 
     @Override
     public void onLoad() {
@@ -49,25 +59,34 @@ public class StackMob extends JavaPlugin {
             getLogger().log(Level.SEVERE, "There was a problem registering hooks. Features won't work.");
             e.printStackTrace();
         }
+        scheduler = Utilities.IS_FOLIA ? new FoliaScheduler() : new BukkitScheduler();
     }
 
     @Override
     public void onEnable() {
-        getLogger().info("StackMob v" + getDescription().getVersion() + " by antiPerson and contributors.");
-        getLogger().info("GitHub: " + Utilities.GITHUB);
-        getLogger().info("Discord: " + Utilities.DISCORD);
+        adventure = BukkitAudiences.create(this);
         traitManager = new TraitManager(this);
         entityManager = new EntityManager(this);
         config = new MainConfig(this);
         entityTranslation = new EntityTranslation(this);
+        updater = new Updater(this, 29999);
+        itemTools = new ItemTools(this);
+        playerManager = new PlayerManager(this);
+        getLogger().info("StackMob v" + getDescription().getVersion() + " by antiPerson and contributors.");
+        getLogger().info("GitHub: " + Utilities.GITHUB + " Discord: " + Utilities.DISCORD);
         getLogger().info("Loading config files...");
-        loadConfig();
+        try {
+            getMainConfig().init();
+            getEntityTranslation().reloadConfig();
+        } catch (IOException e) {
+            getLogger().log(Level.SEVERE, "There was a problem loading the configuration file.");
+            e.printStackTrace();
+        }
         getLogger().info("Registering hooks and trait checks...");
-        try{
-            getTraitManager().registerTraits();
+        try {
             getHookManager().registerHooks();
-        } catch (IllegalAccessException | InstantiationException | NoSuchMethodException | InvocationTargetException e) {
-            getLogger().log(Level.SEVERE, "There was a problem registering traits and hooks. Features won't work.");
+            getTraitManager().registerTraits();
+        } catch (InvocationTargetException | InstantiationException | IllegalAccessException | NoSuchMethodException e) {
             e.printStackTrace();
         }
         getLogger().info("Registering events, commands and tasks...");
@@ -76,57 +95,50 @@ public class StackMob extends JavaPlugin {
         } catch (InvocationTargetException | NoSuchMethodException | InstantiationException | IllegalAccessException e) {
             e.printStackTrace();
         }
-        register();
-        updater = new Updater(this, 29999);
-        getUpdater().checkUpdate().whenComplete(((updateResult, throwable) -> {
-            switch (updateResult.getResult()) {
-                case NONE:
-                    getLogger().info("No update is currently available.");
-                    break;
-                case ERROR:
-                    getLogger().info("There was an error while getting the latest update.");
-                    break;
-                case AVAILABLE:
-                    getLogger().info("A new version is currently available. (" + updateResult.getNewVersion() + ")");
-                    break;
-            }
-        }));
-        Metrics metrics = new Metrics(this);
-        metrics.addCustomChart(new Metrics.SimplePie("stackmobbridge", () -> String.valueOf(Bukkit.getPluginManager().isPluginEnabled("StackMobBridge"))));
-        if (metrics.isEnabled()) {
-            getLogger().info("bStats anonymous data collection has been enabled!");
-        }
-        itemTools = new ItemTools(this);
-    }
-
-    private void loadConfig() {
-        try {
-            getMainConfig().load();
-            getEntityTranslation().load();
-        } catch (IOException e) {
-            getLogger().log(Level.SEVERE, "There was a problem loading the configuration file. Features won't work.");
-            e.printStackTrace();
-        }
-    }
-
-    private void register() {
-        int stackInterval = getMainConfig().getStackInterval();
-        new MergeTask(this).runTaskTimer(this, 5, stackInterval);
-        if (Utilities.isNewBukkit() || getHookManager().getProtocolLibHook() != null) {
-            int tagInterval = getMainConfig().getTagNearbyInterval();
-            new TagTask(this).runTaskTimer(this, 5, tagInterval);
-        } else {
-            getLogger().warning("You are not running the plugins native version and ProtocolLib could not be found (or has been disabled).");
-            getLogger().warning("The display name visibility setting 'NEARBY' will not work unless this is fixed.");
-        }
         PluginCommand command = getCommand("stackmob");
         Commands commands = new Commands(this);
         command.setExecutor(commands);
         command.setTabCompleter(commands);
         commands.registerSubCommands();
+        int stackInterval = getMainConfig().getConfig().getStackInterval();
+        getScheduler().runGlobalTaskTimer(this, new MergeTask(this), 20, stackInterval);
+        int tagInterval = getMainConfig().getConfig().getTagNearbyInterval();
+        getScheduler().runGlobalTaskTimer(this, new TagCheckTask(this), 30, tagInterval);
+        if (getMainConfig().getConfig().isUseArmorStand()) {
+            getScheduler().runGlobalTaskTimer(this, new TagMoveTask(this), 10, 1);
+        }
+        getLogger().info("Detected server version " + Utilities.getMinecraftVersion());
+        if (getHookManager().getProtocolLibHook() == null) {
+            getLogger().warning("ProtocolLib could not be found (or has been disabled). The display name visibility setting 'NEARBY' will not work unless this is fixed.");
+        }
+        getEntityManager().registerAllEntities();
+        getUpdater().checkUpdate().whenComplete(((updateResult, throwable) -> {
+            switch (updateResult.getResult()) {
+                case NONE: getLogger().info("No update is currently available."); break;
+                case ERROR: getLogger().info("There was an error while getting the latest update."); break;
+                case AVAILABLE: getLogger().info("A new version is currently available. (" + updateResult.getNewVersion() + ")"); break;
+            }
+        }));
+        if (!Utilities.isPaper()) {
+            getLogger().warning("It has been detected that you are not using Paper (https://papermc.io).");
+            getLogger().warning("StackMob makes use of Paper's API, which means you're missing out on features.");
+        }
+        new Metrics(this, 522);
+    }
+
+    @Override
+    public void onDisable() {
+        getEntityManager().unregisterAllEntities();
+        Bukkit.getOnlinePlayers().forEach(player -> getPlayerManager().stopWatching(player));
+        if (adventure != null) {
+            adventure.close();
+            adventure = null;
+        }
     }
 
     private void registerEvents() throws InvocationTargetException, NoSuchMethodException, InstantiationException, IllegalAccessException {
+        registerEvent(PlayerArmorStandListener.class);
+        registerEvent(BucketListener.class);
         registerEvent(DeathListener.class);
         registerEvent(TransformListener.class);
         registerEvent(BreedInteractListener.class);
@@ -140,42 +152,31 @@ public class StackMob extends JavaPlugin {
         registerEvent(SpawnListener.class);
         registerEvent(TargetListener.class);
         registerEvent(PlayerListener.class);
+        registerEvent(BeeListener.class);
+        registerEvent(LeashListener.class);
+        registerEvent(EquipListener.class);
+        if (Utilities.isVersionAtLeast(Utilities.MinecraftVersion.V1_20_4)) {
+            registerEvent(KnockbackListener.class);
+        }
+        if (Utilities.isPaper()) {
+            registerEvent(RemoveListener.class);
+            return;
+        }
+        registerEvent(ChunkListener.class);
     }
 
     private void registerEvent(Class<? extends Listener> clazz) throws NoSuchMethodException, IllegalAccessException, InvocationTargetException, InstantiationException {
         ListenerMetadata listenerMetadata = clazz.getAnnotation(ListenerMetadata.class);
         if (listenerMetadata != null) {
-            if (!getMainConfig().isSet(listenerMetadata.config())) {
+            if (!getMainConfig().getConfigFile().isSet(listenerMetadata.config())) {
                 return;
             }
-            if (!getMainConfig().getBoolean(listenerMetadata.config())) {
+            if (!getMainConfig().getConfigFile().getBoolean(listenerMetadata.config())) {
                 return;
             }
         }
         Listener listener = clazz.getDeclaredConstructor(StackMob.class).newInstance(this);
         getServer().getPluginManager().registerEvents(listener, this);
-    }
-
-    public void downloadBridge() {
-        getLogger().info("Installing StackMobBridge (utility to convert legacy mob stacks)...");
-        File file = new File(getDataFolder().getParent(), "StackMobBridge.jar");
-        String bridgeUrl = "http://aqua.api.spiget.org/v2/resources/45495/download";
-        Utilities.downloadFile(file, bridgeUrl).whenComplete(((downloadResult, throwable) -> {
-            if (downloadResult == Utilities.DownloadResult.ERROR) {
-                getLogger().log(Level.SEVERE,"There was an issue while downloading StackMobBridge.");
-                getLogger().log(Level.SEVERE, "This means that mob stacks will not be converted to the newer format.");
-                return;
-            }
-            if (getServer().getPluginManager().getPlugin("StackMobBridge") != null) {
-                return;
-            }
-            try {
-                Plugin plugin = getPluginLoader().loadPlugin(file);
-                getPluginLoader().enablePlugin(plugin);
-            } catch (InvalidPluginException e) {
-                e.printStackTrace();
-            }
-        }));
     }
 
     public EntityTranslation getEntityTranslation() {
@@ -198,6 +199,10 @@ public class StackMob extends JavaPlugin {
         return hookManager;
     }
 
+    public PlayerManager getPlayerManager() {
+        return playerManager;
+    }
+
     public Updater getUpdater() {
         return updater;
     }
@@ -206,15 +211,30 @@ public class StackMob extends JavaPlugin {
         return stackKey;
     }
 
-    public NamespacedKey getWaitKey() {
-        return waitKey;
-    }
-
     public NamespacedKey getToolKey() {
         return toolKey;
     }
 
     public ItemTools getItemTools() {
         return itemTools;
+    }
+
+    public BukkitAudiences getAdventure() {
+        if (adventure == null) {
+            throw new IllegalStateException("Tried to access Adventure when the plugin was disabled!");
+        }
+        return this.adventure;
+    }
+
+    public boolean isStepDamageError() {
+        return stepDamageError;
+    }
+
+    public void setStepDamageError(boolean stepDamageError) {
+        this.stepDamageError = stepDamageError;
+    }
+
+    public Scheduler getScheduler() {
+        return scheduler;
     }
 }

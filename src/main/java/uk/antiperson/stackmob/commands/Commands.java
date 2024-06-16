@@ -1,99 +1,107 @@
 package uk.antiperson.stackmob.commands;
 
-import org.apache.commons.lang.ArrayUtils;
-import org.bukkit.ChatColor;
+import net.kyori.adventure.audience.Audience;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.NamedTextColor;
+import net.kyori.adventure.text.format.TextColor;
+import org.bukkit.Bukkit;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.command.TabCompleter;
-import org.bukkit.entity.*;
+import org.bukkit.entity.EntityType;
+import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import uk.antiperson.stackmob.StackMob;
 import uk.antiperson.stackmob.commands.subcommands.*;
 import uk.antiperson.stackmob.utils.Utilities;
 
+import java.lang.reflect.InvocationTargetException;
 import java.util.*;
 
 public class Commands implements CommandExecutor, TabCompleter {
 
     private final StackMob sm;
-    private final Set<SubCommand> subCommands;
+    private final TreeMap<String, SubCommand> subCommands;
+
     public Commands(StackMob sm) {
         this.sm = sm;
-        this.subCommands = new HashSet<>();
+        this.subCommands = new TreeMap<>();
     }
 
     public void registerSubCommands() {
-        subCommands.add(new About(sm));
-        subCommands.add(new SpawnStack(sm));
-        subCommands.add(new Remove(sm));
-        subCommands.add(new CheckUpdate(sm));
-        subCommands.add(new Upgrade(sm));
-        subCommands.add(new GiveTool(sm));
-        subCommands.add(new Reload(sm));
-        subCommands.add(new ForceStack(sm));
+        register(About.class);
+        register(SpawnStack.class);
+        register(Remove.class);
+        register(CheckUpdate.class);
+        register(Upgrade.class);
+        register(GiveTool.class);
+        register(Reload.class);
+        register(ForceStack.class);
+        register(Stats.class);
+    }
+
+    private void register(Class<? extends SubCommand> subCommandClass) {
+        SubCommand subCommand;
+        try {
+            subCommand = subCommandClass.getConstructor(StackMob.class).newInstance(sm);
+        } catch (InvocationTargetException | InstantiationException | IllegalAccessException | NoSuchMethodException e) {
+            sm.getLogger().info("Error occurred while trying to register " + subCommandClass.getSimpleName() + " sub command!");
+            e.printStackTrace();
+            return;
+        }
+        subCommands.put(subCommand.getCommand(), subCommand);
     }
 
     @Override
     public boolean onCommand(@NotNull CommandSender commandSender, @NotNull Command command, @NotNull String s, @NotNull String[] strings) {
+        Audience sender = sm.getAdventure().sender(commandSender);
+        String cmd = Bukkit.getServer().getPluginCommand("sm").getPlugin().equals(sm) ? "sm" : "stackmob";
         if (!(commandSender.hasPermission("stackmob.admin"))) {
-            commandSender.sendMessage(Utilities.PREFIX + ChatColor.RED + "You do not have permission!");
+            sendError(sender, "You do not have permission!");
             return false;
         }
         if (strings.length == 0) {
-            commandSender.sendMessage(Utilities.PREFIX + ChatColor.GOLD + "Commands: ");
-            for (SubCommand subCommand : subCommands) {
-                StringBuilder args = new StringBuilder();
-                for (CommandArgument argumentType : subCommand.getArguments()) {
-                    StringBuilder options = new StringBuilder();
-                    if (argumentType.getExpectedArguments().size() <= 3 && argumentType.getExpectedArguments().size() > 0) {
-                        argumentType.getExpectedArguments().forEach(argument -> options.append(argument).append("/"));
-                        options.deleteCharAt(options.length() - 1);
-                    } else {
-                        options.append(argumentType.getType());
-                    }
-                    if (argumentType.isOptional()) {
-                        args.append("(").append(options).append(") ");
-                        continue;
-                    }
-                    args.append("[").append(options).append("] ");
-                }
-                commandSender.sendMessage(ChatColor.AQUA + "/sm " + subCommand.getCommand() + " " + args + ChatColor.GRAY + "- " + ChatColor.YELLOW + subCommand.getDescription());
+            Component commands = Utilities.PREFIX.append(Component.text("Commands:").color(TextColor.color(255, 127, 80)));
+            sender.sendMessage(commands);
+            for (SubCommand subCommand : subCommands.values()) {
+                sender.sendMessage(subCommand.buildComponent(cmd));
             }
-            commandSender.sendMessage(ChatColor.GOLD + "Key: () = Optional argument, [] = Mandatory argument.");
+            Component key = Component.text("Key: () = Optional argument, [] = Mandatory argument.").color(TextColor.color(255, 127, 80));
+            sender.sendMessage(key);
             return false;
         }
-        for (SubCommand subCommand : subCommands) {
-            if (!subCommand.getCommand().equalsIgnoreCase(strings[0])) {
-                continue;
-            }
-            if (subCommand.isPlayerRequired() && !(commandSender instanceof Player)) {
-                commandSender.sendMessage(Utilities.PREFIX + ChatColor.RED + "You are not a player!");
-                return false;
-            }
-            if (!validateArgs(subCommand.getArguments(), (String[]) ArrayUtils.remove(strings, 0))) {
-                commandSender.sendMessage(Utilities.PREFIX + ChatColor.RED + "Invalid arguments!");
-                return false;
-            }
-            subCommand.onCommand(new User(commandSender), (String[]) ArrayUtils.remove(strings, 0));
+        SubCommand subCommand = subCommands.get(strings[0].toLowerCase());
+        if (subCommand == null) {
+            sendError(sender, "Invalid subcommand!");
+            return false;
         }
+        if (subCommand.isPlayerRequired() && !(commandSender instanceof Player)) {
+            sendError(sender, "This subcommand requires a player!");
+            return false;
+        }
+        String[] subCmdArgs = Utilities.removeFirst(strings);
+        if (!validateArgs(subCommand.getArguments(), subCmdArgs)) {
+            sendError(sender, "Invalid arguments for '" + subCommand.getCommand() + "'. Usage:");
+            sender.sendMessage(subCommand.buildComponent(cmd));
+            return false;
+        }
+        subCommand.onCommand(new User(sm.getAdventure().sender(commandSender), commandSender), subCmdArgs);
         return false;
     }
 
+    private void sendError(Audience audience, String message) {
+        Component noPerm = Utilities.PREFIX.append(Component.text(message).color(NamedTextColor.RED));
+        audience.sendMessage(noPerm);
+    }
+
     public boolean validateArgs(CommandArgument[] argumentTypes, String[] args) {
-        if (args.length < argumentTypes.length) {
-            if (argumentTypes.length == (args.length + 1)) {
-                CommandArgument argument = argumentTypes[argumentTypes.length - 1];
-                return argument.isOptional();
-            }
-            return false;
-        }
-        for (int i = 0; i < argumentTypes.length; i++) {
+        for (int i = 0; i < args.length; i++) {
             CommandArgument argument = argumentTypes[i];
             switch (argument.getType()) {
                 case BOOLEAN:
-                    if (!(args[i].equals("true") || args[i+1].equals("false"))) return false;
+                    if (!(args[i].equals("true") || args[i].equals("false"))) return false;
                     break;
                 case INTEGER:
                     try {
@@ -104,8 +112,13 @@ public class Commands implements CommandExecutor, TabCompleter {
                     break;
                 case ENTITY_TYPE:
                     try {
-                        EntityType.valueOf(args[i]);
+                        EntityType.valueOf(args[i].toUpperCase());
                     } catch (IllegalArgumentException e) {
+                        return false;
+                    }
+                    break;
+                case WORLD:
+                    if (Bukkit.getWorld(args[i]) == null) {
                         return false;
                     }
                     break;
@@ -115,39 +128,40 @@ public class Commands implements CommandExecutor, TabCompleter {
                     }
             }
         }
+        if (args.length < argumentTypes.length) {
+            if (argumentTypes.length == (args.length + 1)) {
+                CommandArgument argument = argumentTypes[argumentTypes.length - 1];
+                return argument.isOptional();
+            }
+            return false;
+        }
         return true;
     }
 
     @Nullable
     @Override
     public List<String> onTabComplete(@NotNull CommandSender commandSender, @NotNull Command command, @NotNull String s, @NotNull String[] strings) {
-        if (strings.length == 1) {
-            List<String> args = new ArrayList<>();
-            for (SubCommand subCommand : subCommands) {
-                String commandString = subCommand.getCommand();
+        Set<String> expectedArguments = getExpectedArguments(strings);
+        expectedArguments.removeIf(possibleArgument -> !possibleArgument.toLowerCase().startsWith(strings[strings.length - 1].toLowerCase()));
+        return new ArrayList<>(expectedArguments);
+    }
 
-                if (!commandString.toLowerCase().startsWith(strings[0].toLowerCase())) {
-                    continue;
-                }
-                args.add(subCommand.getCommand());
+    private Set<String> getExpectedArguments(String[] strings) {
+        SubCommand subCommand = subCommands.get(strings[0].toLowerCase());
+        if (subCommand == null) {
+            if (strings.length > 1) {
+                return Collections.emptySet();
             }
-            return args;
+            return new HashSet<>(subCommands.keySet());
         }
-        for (SubCommand subCommand : subCommands) {
-            if (!subCommand.getCommand().equalsIgnoreCase(strings[0])) {
-                continue;
-            }
-            if (subCommand.getArguments().length < strings.length - 1) {
-                return null;
-            }
-            CommandArgument commandArgument = subCommand.getArguments()[strings.length - 2];
-
-            List<String> expectedArguments = new LinkedList<>(commandArgument.getExpectedArguments());
-            expectedArguments.removeIf(possibleArgument -> !possibleArgument.toLowerCase().startsWith(strings[strings.length - 1].toLowerCase()));
-            Collections.sort(expectedArguments);
-
-            return expectedArguments;
+        // the subcommand is correct, so length of arguments is length of string array - 1
+        int subCmdArgsLength = strings.length - 1;
+        // if the command has no arguments or the arguments exceed cmd length
+        if (subCmdArgsLength == 0 || subCmdArgsLength > subCommand.getArguments().length) {
+            return Collections.emptySet();
         }
-        return null;
+        // get the argument at this position in the cmd
+        CommandArgument commandArgument = subCommand.getArguments()[subCmdArgsLength - 1];
+        return new TreeSet<>(commandArgument.getExpectedArguments());
     }
 }

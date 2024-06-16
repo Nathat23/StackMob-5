@@ -1,10 +1,12 @@
 package uk.antiperson.stackmob.listeners;
 
-import org.bukkit.entity.*;
+import org.bukkit.entity.LivingEntity;
+import org.bukkit.entity.Monster;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntityTargetEvent;
 import uk.antiperson.stackmob.StackMob;
+import uk.antiperson.stackmob.entity.StackEntity;
 import uk.antiperson.stackmob.utils.Utilities;
 
 @ListenerMetadata(config = "disable-targeting.enabled")
@@ -23,13 +25,12 @@ public class TargetListener implements Listener {
         if (!sm.getEntityManager().isStackedEntity((LivingEntity) event.getEntity())){
             return;
         }
-        if (sm.getMainConfig().getTargetingDisabledTypes(event.getEntityType()).contains(event.getEntityType().toString())) {
+        StackEntity stackEntity = sm.getEntityManager().getStackEntity((LivingEntity) event.getEntity());
+        if (stackEntity.getEntityConfig().isTargetingDisabledTypes()) {
             return;
         }
-        if (Utilities.isPaper()) {
-            if (sm.getMainConfig().getTargetingDisabledReasons(event.getEntityType()).contains(event.getEntity().getEntitySpawnReason())){
-                return;
-            }
+        if (Utilities.isPaper() && stackEntity.getEntityConfig().isTargetingDisabledReasons(event.getEntity().getEntitySpawnReason())){
+            return;
         }
         event.setCancelled(true);
     }

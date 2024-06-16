@@ -16,14 +16,16 @@ public class TransformListener implements Listener {
 
     @EventHandler
     public void onTransform(EntityTransformEvent event){
-        if (event.getTransformReason() != EntityTransformEvent.TransformReason.DROWNED) {
-            return;
-        }
-        if (!sm.getEntityManager().isStackedEntity(((LivingEntity) event.getEntity()))) {
+        if (event.getTransformReason() == EntityTransformEvent.TransformReason.SHEARED ||
+                event.getTransformReason() == EntityTransformEvent.TransformReason.SPLIT) {
             return;
         }
         StackEntity stackEntity = sm.getEntityManager().getStackEntity((LivingEntity) event.getEntity());
-        StackEntity transformed = sm.getEntityManager().getStackEntity((LivingEntity) event.getTransformedEntity());
+        StackEntity transformed = sm.getEntityManager().registerStackedEntity((LivingEntity) event.getTransformedEntity());
+        if (stackEntity == null) {
+            transformed.setForgetOnSpawn(true);
+            return;
+        }
         transformed.setSize(stackEntity.getSize());
     }
 }

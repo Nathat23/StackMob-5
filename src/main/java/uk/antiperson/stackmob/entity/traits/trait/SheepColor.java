@@ -1,20 +1,19 @@
 package uk.antiperson.stackmob.entity.traits.trait;
 
-import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Sheep;
 import uk.antiperson.stackmob.entity.traits.Trait;
 import uk.antiperson.stackmob.entity.traits.TraitMetadata;
 
-@TraitMetadata(entity = Sheep.class, path = "sheep-color")
-public class SheepColor implements Trait {
+@TraitMetadata(path = "sheep-color")
+public class SheepColor implements Trait<Sheep> {
 
     @Override
-    public boolean checkTrait(LivingEntity first, LivingEntity nearby) {
-        return ((Sheep) first).getColor() != ((Sheep) nearby).getColor();
+    public boolean checkTrait(Sheep first, Sheep nearby) {
+        return first.getColor() != nearby.getColor();
     }
 
     @Override
-    public void applyTrait(LivingEntity spawned, LivingEntity dead) {
-        ((Sheep) spawned).setColor(((Sheep) dead).getColor());
+    public void applyTrait(Sheep spawned, Sheep dead) {
+        spawned.setColor(dead.getColor());
     }
 }
